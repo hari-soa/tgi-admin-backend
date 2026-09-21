@@ -1,4 +1,10 @@
-import { User, Gender } from "./userModel";
+import { User } from "./userModel";
+
+export enum Gender {
+  MALE = "MALE",
+  FEMALE = "FEMALE",
+  OTHER = "OTHER",
+}
 
 export interface Student extends User {
   classRollNumber: number;
@@ -8,5 +14,6 @@ export interface Student extends User {
   address: string;
   parentsEmail: string;
   parentsContactNumber: string;
+  profilePictureUrl: string;
   comments?: string;
 }
