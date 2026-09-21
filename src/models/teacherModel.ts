@@ -1,11 +1,5 @@
 import { User } from "./userModel";
-
-export interface Subject {
-  id: string;
-  name: string;
-  code?: string;
-  description?: string;
-}
+import { Subject } from "./subjectModel";
 
 export interface Teacher extends User {
   subjects: Subject[];

@@ -1,11 +1,6 @@
-export enum Gender {
-  MALE = "MALE",
-  FEMALE = "FEMALE",
-  OTHER = "OTHER",
-}
-
 export interface User {
   id: string;
+  password: string;
   firstName: string;
   lastName: string;
   contactNumber: string;
