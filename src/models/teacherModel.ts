@@ -3,8 +3,8 @@ import { User } from "./userModel";
 export interface Subject {
   id: string;
   name: string;
-  code?: string;
-  description?: string;
+  coefficient: number;
+  targetClasses: string[];
 }
 
 export interface Teacher extends User {
