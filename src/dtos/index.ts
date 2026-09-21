@@ -10,3 +10,4 @@ export * from "./resultDto";
 export * from "./scheduleDto";
 export * from "./studentHistoryDto";
 export * from "./studentRemarkDto";
+export * from "./subjectDto";
