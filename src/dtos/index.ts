@@ -6,3 +6,4 @@ export * from "./administratorDto";
 export * from "./secretaryDto";
 export * from "./gradeDto";
 export * from "./announcementDto";
+export * from "./resultDto";
