@@ -2,3 +2,8 @@ export * from "./validateMiddlewares";
 export * from "./userDTO";
 export * from "./gradeDto";
 export * from "./announcementDto";
+export * from "./studentDto";
+export * from "./teacherDto";
+export * from "./administratorDto";
+export * from "./gradeDto";
+export * from "./announcementDto";
