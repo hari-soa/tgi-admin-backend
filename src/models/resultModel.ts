@@ -1,13 +1,18 @@
-import { Term } from "./gradeModel";
-
 export enum ResultStatus {
   DRAFT = "DRAFT",
   APPROVED = "APPROVED",
   PUBLISHED = "PUBLISHED",
 }
 
+export enum AcademicDecision {
+  PASS = "PASS",
+  FAIL = "FAIL",
+  PENDING = "PENDING",
+}
+
 export interface SubjectGradeBreakdown {
   subjectId: string;
+  subjectName?: string;
   coefficient: number;
   term1SemiTrimesterGrade?: number;
   term1TrimesterGrade?: number;
@@ -27,9 +32,11 @@ export interface AnnualResult {
   subjects: SubjectGradeBreakdown[];
   totalCoefficients: number;
   overallAverage: number;
+  decision: AcademicDecision;
   classRank?: number;
   createdBySecretaryId: string;
   approvedByAdminId?: string;
+  pdfExportUrl?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
