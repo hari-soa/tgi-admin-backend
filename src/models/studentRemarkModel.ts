@@ -6,16 +6,11 @@ export enum RemarkCategory {
   OTHER = "OTHER",
 }
 
-export enum AuthorRole {
-  TEACHER = "TEACHER",
-  ADMINISTRATOR = "ADMINISTRATOR",
-}
-
 export interface StudentRemark {
   id: string;
   studentId: string;
   authorId: string;
-  authorRole: AuthorRole;
+  authorRole: string;
   category: RemarkCategory;
   content: string;
   createdAt: Date;
