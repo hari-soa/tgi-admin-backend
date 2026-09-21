@@ -1,12 +1,15 @@
-export * from "./models/userModel";
-export * from "./models/subjectModel";
-export * from "./models/teacherModel";
-export * from "./models/studentModel";
-export * from "./models/administratorModel";
-export * from "./models/secretaryModel";
-export * from "./models/scheduleModel";
-export * from "./models/studentHistoryModel";
-export * from "./models/gradeModel";
-export * from "./models/resultModel";
-export * from "./models/studentRemarkModel";
-export * from "./models/announcementModel";
+import express from "express";
+import { globalErrorHandler } from "./middlewares/errorHandler";
+import { AppError } from "./utils/AppError";
+
+const app = express();
+
+app.use(express.json());
+
+app.all("*", (req, _res, next) => {
+  next(new AppError(`Cannot find ${req.originalUrl} on this server!`, 404));
+});
+
+app.use(globalErrorHandler);
+
+export default app;
