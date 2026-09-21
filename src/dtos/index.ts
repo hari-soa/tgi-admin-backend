@@ -8,3 +8,4 @@ export * from "./gradeDto";
 export * from "./announcementDto";
 export * from "./resultDto";
 export * from "./scheduleDto";
+export * from "./studentHistoryDto";
