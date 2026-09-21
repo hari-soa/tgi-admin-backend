@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 export const examTypeEnum = ["SEMI_TRIMESTER", "TRIMESTER"] as const;
-export const termEnum = [1, 2, 3] as const;
 
 export const createGradeSchema = z.object({
   body: z.object({
@@ -34,10 +33,7 @@ export const updateGradeSchema = z.object({
     value: z.number().min(0).optional(),
     maxScore: z.number().positive().optional(),
     examType: z.enum(examTypeEnum).optional(),
-    term: z
-      .number()
-      .pipe(z.nativeEnum({ 1: 1, 2: 2, 3: 3 }))
-      .optional(),
+    term: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
     evaluationDate: z.coerce.date().optional(),
   }),
 });
