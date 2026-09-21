@@ -6,3 +6,7 @@ export * from "./models/administratorModel";
 export * from "./models/secretaryModel";
 export * from "./models/scheduleModel";
 export * from "./models/studentHistoryModel";
+export * from "./models/gradeModel";
+export * from "./models/resultModel";
+export * from "./models/studentRemarkModel";
+export * from "./models/announcementModel";
