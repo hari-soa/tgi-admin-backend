@@ -1,4 +1,5 @@
 import { User } from "./userModel";
+import { StudentHistoryRecord } from "./studentHistoryModel";
 
 export enum Gender {
   MALE = "MALE",
@@ -16,4 +17,5 @@ export interface Student extends User {
   parentsContactNumber: string;
   profilePictureUrl: string;
   comments?: string;
+  historyRecords?: StudentHistoryRecord[];
 }
