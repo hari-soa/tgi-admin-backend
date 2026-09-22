@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const genderEnum = ["MALE", "FEMALE", "OTHER"] as const;
+export const classGroupEnum = ["SECONDE", "PREMIERE", "TERMINALE"] as const;
 
 export const createStudentSchema = z.object({
   body: z.object({
@@ -19,7 +20,9 @@ export const createStudentSchema = z.object({
       .number({ message: "Class roll number is required" })
       .int()
       .positive(),
-    classGroup: z.string({ message: "Class group is required" }),
+    classGroup: z.enum(classGroupEnum, {
+      message: "Invalid class group option",
+    }),
     dateOfBirth: z
       .string({ message: "Date of birth is required" })
       .datetime()
@@ -50,7 +53,7 @@ export const updateStudentSchema = z.object({
     email: z.string().email().trim().toLowerCase().optional(),
     profilePictureUrl: z.string().url().optional(),
     classRollNumber: z.number().int().positive().optional(),
-    classGroup: z.string().optional(),
+    classGroup: z.enum(classGroupEnum).optional(),
     dateOfBirth: z.string().datetime().or(z.date()).optional(),
     gender: z.enum(genderEnum).optional(),
     address: z.string().optional(),
