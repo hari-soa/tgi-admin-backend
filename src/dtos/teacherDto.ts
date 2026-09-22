@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { classGroupEnum } from "./studentDto";
 
 export const createTeacherSchema = z.object({
   body: z.object({
@@ -16,7 +17,7 @@ export const createTeacherSchema = z.object({
     subjectIds: z
       .array(z.string())
       .min(1, "Teacher must be assigned to at least one subject"),
-    homeroomClass: z.string().optional(),
+    homeroomClass: z.enum(classGroupEnum).optional(),
   }),
 });
 
@@ -32,7 +33,7 @@ export const updateTeacherSchema = z.object({
     email: z.string().email().trim().toLowerCase().optional(),
     profilePictureUrl: z.string().url().optional(),
     subjectIds: z.array(z.string()).optional(),
-    homeroomClass: z.string().optional(),
+    homeroomClass: z.enum(classGroupEnum).optional(),
   }),
 });
 
