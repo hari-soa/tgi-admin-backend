@@ -1,7 +1,9 @@
+import { ClassGroup } from "./classGroupEnum";
+
 export interface Subject {
   id: string;
   name: string;
   coefficient: number;
-  targetClasses: string[];
+  targetClasses: ClassGroup[];
   description?: string;
 }
