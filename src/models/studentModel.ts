@@ -1,5 +1,6 @@
 import { User } from "./userModel";
 import { StudentHistoryRecord } from "./studentHistoryModel";
+import { ClassGroup } from "./classGroupEnum";
 
 export enum Gender {
   MALE = "MALE",
@@ -9,7 +10,7 @@ export enum Gender {
 
 export interface Student extends User {
   classRollNumber: number;
-  classGroup: string;
+  classGroup: ClassGroup;
   dateOfBirth: Date;
   gender: Gender;
   address: string;

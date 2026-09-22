@@ -1,0 +1,682 @@
+openapi: 3.1.0
+info:
+  title: School Management System API
+  description: Backend API for school establishment management (Node.js, Express, TypeScript, PostgreSQL).
+  version: 1.0.0
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Local development server
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Authentication
+    description: Endpoints for user login and token management
+  - name: Users
+    description: Operations related to managing students, teachers, and system users
+  - name: Subjects
+    description: Academic subjects management
+  - name: Schedules
+    description: Timetables and calendar events management
+  - name: Grades
+    description: Student evaluation and grade records
+  - name: Results
+    description: Academic report card processing and summaries
+  - name: Student Tracking
+    description: Attendance, discipline history, and student remarks
+  - name: Announcements
+    description: Broadcast announcements for various user target groups
+
+paths:
+  /auth/login:
+    post:
+      summary: Authenticate user
+      tags:
+        - Authentication
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                contactNumber:
+                  type: string
+                password:
+                  type: string
+                  minLength: 8
+      responses:
+        "200":
+          description: Authentication successful. Returns JWT token and user profile.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  user:
+                    $ref: "#/components/schemas/User"
+        "401":
+          description: Invalid credentials.
+
+  /auth/me:
+    get:
+      summary: Retrieve authenticated user profile
+      tags:
+        - Authentication
+      responses:
+        "200":
+          description: Authenticated user profile retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized.
+
+  /users/students:
+    post:
+      summary: Create student profile (Admin)
+      tags:
+        - Users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStudentDto"
+      responses:
+        "201":
+          description: Student created successfully.
+        "400":
+          description: Invalid input data.
+
+  /users/teachers:
+    post:
+      summary: Create teacher profile (Admin)
+      tags:
+        - Users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTeacherDto"
+      responses:
+        "201":
+          description: Teacher created successfully.
+
+  /users:
+    get:
+      summary: List users with filters and pagination (Admin)
+      tags:
+        - Users
+      parameters:
+        - name: role
+          in: query
+          schema:
+            $ref: "#/components/schemas/UserRole"
+        - name: classGroup
+          in: query
+          schema:
+            $ref: "#/components/schemas/ClassGroup"
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of users retrieved successfully.
+
+  /users/{id}:
+    get:
+      summary: Retrieve user by custom school ID
+      tags:
+        - Users
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/CustomUserId"
+      responses:
+        "200":
+          description: User details retrieved.
+        "404":
+          description: User not found.
+    put:
+      summary: Update user profile (Admin)
+      tags:
+        - Users
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/CustomUserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: User updated successfully.
+    delete:
+      summary: Delete user profile (Admin)
+      tags:
+        - Users
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/CustomUserId"
+      responses:
+        "204":
+          description: User deleted successfully.
+
+  /subjects:
+    post:
+      summary: Create new subject (Admin)
+      tags:
+        - Subjects
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSubjectDto"
+      responses:
+        "201":
+          description: Subject created successfully.
+    get:
+      summary: List all subjects
+      tags:
+        - Subjects
+      parameters:
+        - name: targetClass
+          in: query
+          schema:
+            $ref: "#/components/schemas/ClassGroup"
+      responses:
+        "200":
+          description: List of subjects retrieved.
+
+  /timetables:
+    post:
+      summary: Create timetable for an academic year (Admin)
+      tags:
+        - Schedules
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - academicYear
+              properties:
+                title:
+                  type: string
+                academicYear:
+                  type: string
+      responses:
+        "201":
+          description: Timetable created successfully.
+
+  /schedules/events:
+    post:
+      summary: Add event (Course, Exam, Other) to timetable
+      tags:
+        - Schedules
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScheduleEvent"
+      responses:
+        "201":
+          description: Event added successfully.
+    get:
+      summary: List timetable events (filterable by class or teacher)
+      tags:
+        - Schedules
+      parameters:
+        - name: classGroup
+          in: query
+          schema:
+            $ref: "#/components/schemas/ClassGroup"
+        - name: teacherId
+          in: query
+          schema:
+            $ref: "#/components/schemas/CustomUserId"
+      responses:
+        "200":
+          description: List of schedule events retrieved.
+
+  /grades:
+    post:
+      summary: Record new grade entry (Secretary / Admin)
+      tags:
+        - Grades
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Grade"
+      responses:
+        "201":
+          description: Grade recorded successfully.
+
+  /grades/student/{studentId}:
+    get:
+      summary: Retrieve all grades for a specific student
+      tags:
+        - Grades
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/CustomUserId"
+      responses:
+        "200":
+          description: Student grades retrieved successfully.
+
+  /results/calculate:
+    post:
+      summary: Generate student report card / annual result (Secretary)
+      tags:
+        - Results
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - studentId
+                - academicYear
+              properties:
+                studentId:
+                  $ref: "#/components/schemas/CustomUserId"
+                academicYear:
+                  type: string
+      responses:
+        "200":
+          description: Report card generated successfully.
+
+  /results/student/{studentId}:
+    get:
+      summary: Get annual academic results for a student
+      tags:
+        - Results
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/CustomUserId"
+      responses:
+        "200":
+          description: Student report card retrieved.
+
+  /students/{studentId}/history:
+    post:
+      summary: Record absence, lateness, suspension, or infirmary visit (Admin)
+      tags:
+        - Student Tracking
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/CustomUserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudentHistoryRecord"
+      responses:
+        "201":
+          description: Tracking history entry created.
+
+  /students/{studentId}/remarks:
+    post:
+      summary: Add observation or warning remark for a student
+      tags:
+        - Student Tracking
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/CustomUserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudentRemark"
+      responses:
+        "201":
+          description: Student remark added successfully.
+
+  /announcements:
+    post:
+      summary: Create and publish announcement
+      tags:
+        - Announcements
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Announcement"
+      responses:
+        "201":
+          description: Announcement published successfully.
+    get:
+      summary: Retrieve targeted announcements for logged-in user
+      tags:
+        - Announcements
+      responses:
+        "200":
+          description: List of targeted announcements.
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    CustomUserId:
+      type: string
+      pattern: "^[A-Z]{3}-\\d{2}\\d{2,4}$"
+      example: "TGI-25003"
+      description: "Custom user identifier format: [Section/Class Tag]-[Year Entry Number][Class Roll Number]"
+
+    ClassGroup:
+      type: string
+      enum:
+        - SECONDE
+        - PREMIERE
+        - TERMINALE
+
+    UserRole:
+      type: string
+      enum:
+        - ADMIN
+        - TEACHER
+        - SECRETARY
+        - STUDENT
+
+    Gender:
+      type: string
+      enum:
+        - MALE
+        - FEMALE
+        - OTHER
+
+    User:
+      type: object
+      required:
+        - id
+        - firstName
+        - lastName
+        - contactNumber
+        - userType
+      properties:
+        id:
+          $ref: "#/components/schemas/CustomUserId"
+        firstName:
+          type: string
+        lastName:
+          type: string
+        contactNumber:
+          type: string
+        email:
+          type: string
+          format: email
+        profilePictureUrl:
+          type: string
+          format: uri
+        userType:
+          $ref: "#/components/schemas/UserRole"
+
+    CreateStudentDto:
+      type: object
+      required:
+        - firstName
+        - lastName
+        - password
+        - contactNumber
+        - classRollNumber
+        - classGroup
+        - dateOfBirth
+        - gender
+        - address
+        - parentsEmail
+        - parentsContactNumber
+      properties:
+        firstName:
+          type: string
+          minLength: 2
+        lastName:
+          type: string
+          minLength: 2
+        password:
+          type: string
+          minLength: 8
+        contactNumber:
+          type: string
+        email:
+          type: string
+          format: email
+        profilePictureUrl:
+          type: string
+          format: uri
+        classRollNumber:
+          type: integer
+          minimum: 1
+        classGroup:
+          $ref: "#/components/schemas/ClassGroup"
+        dateOfBirth:
+          type: string
+          format: date-time
+        gender:
+          $ref: "#/components/schemas/Gender"
+        address:
+          type: string
+        parentsEmail:
+          type: string
+          format: email
+        parentsContactNumber:
+          type: string
+        comments:
+          type: string
+
+    CreateTeacherDto:
+      type: object
+      required:
+        - firstName
+        - lastName
+        - password
+        - contactNumber
+        - subjectIds
+      properties:
+        firstName:
+          type: string
+          minLength: 2
+        lastName:
+          type: string
+          minLength: 2
+        password:
+          type: string
+          minLength: 8
+        contactNumber:
+          type: string
+        email:
+          type: string
+          format: email
+        subjectIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          minItems: 1
+        homeroomClass:
+          $ref: "#/components/schemas/ClassGroup"
+
+    CreateSubjectDto:
+      type: object
+      required:
+        - name
+        - coefficient
+        - targetClasses
+      properties:
+        name:
+          type: string
+          minLength: 2
+        coefficient:
+          type: number
+          minimum: 0.1
+        targetClasses:
+          type: array
+          items:
+            $ref: "#/components/schemas/ClassGroup"
+          minItems: 1
+        description:
+          type: string
+
+    ScheduleEvent:
+      type: object
+      required:
+        - type
+        - startTime
+        - endTime
+        - targetClasses
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [COURSE, EXAM, OTHER]
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        targetClasses:
+          type: array
+          items:
+            $ref: "#/components/schemas/ClassGroup"
+        classroom:
+          type: string
+
+    Grade:
+      type: object
+      required:
+        - studentId
+        - subjectId
+        - classGroup
+        - examType
+        - term
+        - value
+        - maxScore
+        - evaluationDate
+      properties:
+        id:
+          type: string
+          format: uuid
+        studentId:
+          $ref: "#/components/schemas/CustomUserId"
+        subjectId:
+          type: string
+          format: uuid
+        classGroup:
+          $ref: "#/components/schemas/ClassGroup"
+        examType:
+          type: string
+          enum: [SEMI_TRIMESTER, TRIMESTER]
+        term:
+          type: integer
+          enum: [1, 2, 3]
+        value:
+          type: number
+          minimum: 0
+        maxScore:
+          type: number
+          default: 20
+        evaluationDate:
+          type: string
+          format: date
+
+    StudentHistoryRecord:
+      type: object
+      required:
+        - type
+        - startDate
+        - endDate
+        - reason
+      properties:
+        type:
+          type: string
+          enum: [ABSENCE, LATENESS, SUSPENSION, INFIRMARY, EARLY_LEAVE_PERMIT]
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        reason:
+          type: string
+
+    StudentRemark:
+      type: object
+      required:
+        - category
+        - content
+      properties:
+        category:
+          type: string
+          enum: [BEHAVIOR, ACADEMIC, WARNING, ENCOURAGEMENT, OTHER]
+        content:
+          type: string
+
+    Announcement:
+      type: object
+      required:
+        - title
+        - content
+        - targetScope
+        - priority
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+        targetScope:
+          type: string
+          enum: [ALL, CLASS, TEACHERS_ONLY, STUDENTS_ONLY]
+        priority:
+          type: string
+          enum: [NORMAL, URGENT]
