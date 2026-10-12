@@ -3,9 +3,12 @@ import cors from "cors";
 import helmet from "helmet";
 import { globalErrorHandler } from "./middlewares/errorHandler";
 import { AppError } from "./utils/AppError";
+import authRoutes from "./routes/authRoutes";
 
 const app = express();
 const PORT = process.env.PORT;
+
+app.use("/api/v1/auth", authRoutes);
 
 app.use(helmet());
 app.use(cors());
