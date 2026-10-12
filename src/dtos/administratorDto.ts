@@ -13,10 +13,28 @@ export const createAdministratorSchema = z.object({
       .toLowerCase()
       .optional(),
     profilePictureUrl: z.string().url().optional(),
-    role: z.string({ message: "Role is required" }),
+    role: z.string({ message: "Role is required" }).optional(),
+  }),
+});
+
+export const updateAdministratorSchema = z.object({
+  params: z.object({
+    id: z.string({ message: "Administrator ID parameter is required" }),
+  }),
+  body: z.object({
+    firstName: z.string().min(2).trim().optional(),
+    lastName: z.string().min(2).trim().optional(),
+    password: z.string().min(8).optional(),
+    contactNumber: z.string().optional(),
+    email: z.string().email().trim().toLowerCase().optional(),
+    profilePictureUrl: z.string().url().optional(),
+    role: z.string().optional(),
   }),
 });
 
 export type CreateAdministratorDto = z.infer<
   typeof createAdministratorSchema
+>["body"];
+export type UpdateAdministratorDto = z.infer<
+  typeof updateAdministratorSchema
 >["body"];

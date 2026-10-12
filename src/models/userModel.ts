@@ -6,7 +6,7 @@ export interface User {
   email?: string;
   password?: string;
   matricule?: string;
-  role: "ADMIN" | "STUDENT" | "SECRETARY";
+  role: "ADMIN" | "STUDENT" | "SECRETARY" | "TEACHER";
   profilePictureUrl?: string;
   createdAt?: Date;
   updatedAt?: Date;

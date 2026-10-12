@@ -12,6 +12,8 @@ const router = Router();
 
 router.use(authenticate);
 
+router.get("/me", UserController.getMyProfile);
+
 router.post(
   "/admin",
   authorize("ADMIN"),
@@ -34,5 +36,7 @@ router.post(
 );
 
 router.get("/:id", authorize("ADMIN", "SECRETARY"), UserController.getUserById);
+
+router.patch("/:id", authorize("ADMIN"), UserController.updateUser);
 
 export default router;
