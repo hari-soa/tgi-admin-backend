@@ -9,7 +9,7 @@ export interface LoginResult {
     id: string;
     firstName: string;
     lastName: string;
-    email: string;
+    email?: string;
     role: string;
   };
   redirectUrl: string;
@@ -23,15 +23,15 @@ export class AuthService {
       throw new AppError("Invalid email or matricule", 401);
     }
 
-    if (user.matricule !== dto.matricule) {
+    const userMatricule = user.matricule || user.password;
+    if (userMatricule !== dto.matricule) {
       throw new AppError("Invalid email or matricule", 401);
     }
 
     const redirectUrl = user.role === "ADMIN" ? "/dashboard" : "/home";
 
-    // Génération du token JWT
     const token = generateToken({
-      id: user.id,
+      userId: user.id,
       role: user.role,
       email: user.email,
     });
@@ -40,8 +40,8 @@ export class AuthService {
       token,
       user: {
         id: user.id,
-        firstName: user.first_name,
-        lastName: user.last_name,
+        firstName: user.firstName,
+        lastName: user.lastName,
         email: user.email,
         role: user.role,
       },
