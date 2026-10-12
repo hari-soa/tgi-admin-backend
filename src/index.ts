@@ -6,12 +6,14 @@ import { AppError } from "./utils/AppError";
 
 import authRoutes from "./routes/authRoutes";
 import userRoutes from "./routes/userRoutes";
+import announcementRoutes from "./routes/announcementRoutes";
 
 const app = express();
 const PORT = process.env.PORT;
 
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRoutes);
+app.use("/api/v1/announcements", announcementRoutes);
 
 app.use(helmet());
 app.use(cors());
