@@ -39,9 +39,7 @@ export const createAnnualResultSchema = z.object({
       .min(0, "Average cannot be negative"),
     decision: z.enum(academicDecisionEnum).default("PENDING"),
     classRank: z.number().int().positive().optional(),
-    createdBySecretaryId: z.string({ message: "Secretary ID is required" }),
-    approvedByAdminId: z.string().optional(),
-    pdfExportUrl: z.url({ message: "Invalid URL format" }).optional(),
+    pdfExportUrl: z.string().url({ message: "Invalid URL format" }).optional(),
   }),
 });
 
@@ -56,8 +54,7 @@ export const updateAnnualResultSchema = z.object({
     overallAverage: z.number().min(0).optional(),
     decision: z.enum(academicDecisionEnum).optional(),
     classRank: z.number().int().positive().optional(),
-    approvedByAdminId: z.string().optional(),
-    pdfExportUrl: z.url().optional(),
+    pdfExportUrl: z.string().url().optional(),
   }),
 });
 

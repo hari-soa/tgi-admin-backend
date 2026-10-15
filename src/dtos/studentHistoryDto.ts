@@ -14,20 +14,14 @@ export const createStudentHistoryRecordSchema = z.object({
     type: z.enum(studentHistoryTypeEnum, {
       message: "Invalid student history type",
     }),
-    startDate: z.coerce.date({
-      message: "Invalid or missing start date",
-    }),
-    endDate: z.coerce.date({
-      message: "Invalid or missing end date",
-    }),
+    startDate: z.coerce.date({ message: "Invalid or missing start date" }),
+    endDate: z.coerce.date({ message: "Invalid or missing end date" }),
     reason: z
       .string({ message: "Reason is required" })
       .min(3, "Reason must be at least 3 characters long")
       .trim(),
-    createdByAdminId: z.string({ message: "Admin ID is required" }),
   }),
 });
-
 export const updateStudentHistoryRecordSchema = z.object({
   params: z.object({
     id: z.string({ message: "Record ID parameter is required" }),

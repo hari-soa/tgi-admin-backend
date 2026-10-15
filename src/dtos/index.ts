@@ -1,4 +1,4 @@
-export * from "./validateMiddlewares";
+export * from "../middlewares/validateMiddlewares";
 export * from "./userDto";
 export * from "./studentDto";
 export * from "./teacherDto";
