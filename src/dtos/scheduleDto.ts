@@ -1,17 +1,19 @@
 import { z } from "zod";
+import { classGroupEnum } from "./studentDto";
 
 export const eventTypeEnum = ["COURSE", "EXAM", "OTHER"] as const;
 
 const baseScheduleEventSchema = z.object({
   startTime: z.coerce.date({ message: "Invalid or missing start time" }),
   endTime: z.coerce.date({ message: "Invalid or missing end time" }),
-  createdByAdminId: z.string({ message: "Admin ID is required" }),
 });
 
 export const courseEventSchema = baseScheduleEventSchema.extend({
   type: z.literal("COURSE"),
   subjectId: z.string({ message: "Subject ID is required" }),
-  targetClass: z.string({ message: "Target class is required" }),
+  targetClass: z.enum(classGroupEnum, {
+    message: "Invalid or missing target class",
+  }),
   teacherId: z.string().optional(),
   classroom: z.string({ message: "Classroom is required" }),
 });
@@ -26,7 +28,7 @@ export const examSubjectDetailSchema = z.object({
 export const examEventSchema = baseScheduleEventSchema.extend({
   type: z.literal("EXAM"),
   targetClasses: z
-    .array(z.string())
+    .array(z.enum(classGroupEnum))
     .min(1, "Exam must target at least one class"),
   subjects: z
     .array(examSubjectDetailSchema)
@@ -38,7 +40,7 @@ export const otherEventSchema = baseScheduleEventSchema.extend({
   type: z.literal("OTHER"),
   label: z.string({ message: "Event label is required" }).min(2).trim(),
   targetClasses: z
-    .array(z.string())
+    .array(z.enum(classGroupEnum))
     .min(1, "Event must target at least one class"),
   location: z.string({ message: "Location is required" }),
 });
