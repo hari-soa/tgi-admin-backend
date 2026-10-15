@@ -175,7 +175,35 @@ export class UserRepository {
         s.date_of_birth AS "dateOfBirth", s.gender, s.address, 
         s.parents_email AS "parentsEmail", s.parents_contact_number AS "parentsContactNumber", s.comments,
         sec.department,
-        t.homeroom_class AS "homeroomClass"
+        t.homeroom_class AS "homeroomClass",
+        
+        -- Récupération de l'historique disciplinaire si c'est un étudiant
+        COALESCE((
+          SELECT json_agg(json_build_object(
+            'id', h.id,
+            'type', h.type,
+            'startDate', h.start_date,
+            'endDate', h.end_date,
+            'reason', h.reason,
+            'createdAt', h.created_at
+          ) ORDER BY h.created_at DESC)
+          FROM student_history_records h
+          WHERE h.student_id = u.id
+        ), '[]'::json) AS "historyRecords",
+
+        -- Récupération des remarques si c'est un étudiant
+        COALESCE((
+          SELECT json_agg(json_build_object(
+            'id', r.id,
+            'category', r.category,
+            'content', r.content,
+            'authorRole', r.author_role,
+            'createdAt', r.created_at
+          ) ORDER BY r.created_at DESC)
+          FROM student_remarks r
+          WHERE r.student_id = u.id
+        ), '[]'::json) AS "remarks"
+
       FROM users u
       LEFT JOIN administrators a ON u.id = a.user_id
       LEFT JOIN students s ON u.id = s.user_id
@@ -187,6 +215,7 @@ export class UserRepository {
     const { rows } = await pool.query(query, [id]);
     return rows[0] || null;
   }
+
   public static async updateUserBase(
     id: string,
     data: {

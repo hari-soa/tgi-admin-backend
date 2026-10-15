@@ -11,8 +11,6 @@ export const remarkCategoryEnum = [
 export const createStudentRemarkSchema = z.object({
   body: z.object({
     studentId: z.string({ message: "Student ID is required" }),
-    authorId: z.string({ message: "Author ID is required" }),
-    authorRole: z.string({ message: "Author role is required" }),
     category: z.enum(remarkCategoryEnum, {
       message: "Invalid remark category",
     }),

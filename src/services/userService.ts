@@ -88,19 +88,22 @@ export class UserService {
     if (!targetUser) {
       throw new AppError("User not found", 404);
     }
-
     const { userId: requesterId, role: requesterRole } = requestingUser;
     if (requesterRole === "ADMIN") {
       return targetUser;
     }
-    if (requesterId === targetUserId) {
-      return targetUser;
-    }
-    if (requesterRole === "STUDENT" && targetUser.userType === "STUDENT") {
+    if (
+      requesterRole === "STUDENT" &&
+      targetUser.role === "STUDENT" &&
+      requesterId !== targetUserId
+    ) {
       throw new AppError(
         "You are not authorized to view another student's profile",
         403,
       );
+    }
+    if (requesterId === targetUserId) {
+      return targetUser;
     }
     if (requesterRole === "STUDENT" || requesterRole === "SECRETARY") {
       return {
@@ -110,12 +113,12 @@ export class UserService {
         email: targetUser.email,
         contactNumber: targetUser.contactNumber,
         profilePictureUrl: targetUser.profilePictureUrl,
-        userType: targetUser.userType,
-        adminRole: targetUser.adminRole,
+        role: targetUser.role,
         department: targetUser.department,
         homeroomClass: targetUser.homeroomClass,
       };
     }
+
     return targetUser;
   }
 
