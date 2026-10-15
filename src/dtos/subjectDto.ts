@@ -1,6 +1,13 @@
 import { z } from "zod";
 import { classGroupEnum } from "./studentDto";
 
+export const classAssignmentSchema = z.object({
+  classGroup: z.enum(classGroupEnum, { message: "Invalid class group" }),
+  teacherId: z.string({
+    message: "Teacher ID is required for each targeted class",
+  }),
+});
+
 export const createSubjectSchema = z.object({
   body: z.object({
     name: z
@@ -10,10 +17,13 @@ export const createSubjectSchema = z.object({
     coefficient: z
       .number({ message: "Coefficient is required" })
       .positive("Coefficient must be greater than 0"),
-    targetClasses: z
-      .array(z.enum(classGroupEnum))
-      .min(1, "Subject must target at least one valid class"),
     description: z.string().optional(),
+    assignments: z
+      .array(classAssignmentSchema)
+      .min(
+        1,
+        "Subject must target at least one class with an assigned teacher",
+      ),
   }),
 });
 
@@ -24,8 +34,8 @@ export const updateSubjectSchema = z.object({
   body: z.object({
     name: z.string().min(2).trim().optional(),
     coefficient: z.number().positive().optional(),
-    targetClasses: z.array(z.enum(classGroupEnum)).min(1).optional(),
     description: z.string().optional(),
+    assignments: z.array(classAssignmentSchema).min(1).optional(),
   }),
 });
 

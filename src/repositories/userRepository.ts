@@ -202,7 +202,20 @@ export class UserRepository {
           ) ORDER BY r.created_at DESC)
           FROM student_remarks r
           WHERE r.student_id = u.id
-        ), '[]'::json) AS "remarks"
+        ), '[]'::json) AS "remarks",
+
+        -- Récupération des matières enseignées si c'est un professeur
+        COALESCE((
+          SELECT json_agg(json_build_object(
+            'subjectId', sub.id,
+            'subjectName', sub.name,
+            'coefficient', sub.coefficient,
+            'classGroup', tsc.class_group
+          ))
+          FROM teacher_subject_classes tsc
+          JOIN subjects sub ON tsc.subject_id = sub.id
+          WHERE tsc.teacher_id = u.id
+        ), '[]'::json) AS "subjectsTeaching"
 
       FROM users u
       LEFT JOIN administrators a ON u.id = a.user_id

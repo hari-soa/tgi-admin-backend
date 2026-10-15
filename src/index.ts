@@ -7,6 +7,8 @@ import { AppError } from "./utils/AppError";
 import authRoutes from "./routes/authRoutes";
 import userRoutes from "./routes/userRoutes";
 import announcementRoutes from "./routes/announcementRoutes";
+import disciplinaryRoutes from "./routes/disciplinaryRoutes";
+import subjectRoutes from "./routes/subjectRoutes";
 
 const app = express();
 const PORT = process.env.PORT;
@@ -14,6 +16,8 @@ const PORT = process.env.PORT;
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/announcements", announcementRoutes);
+app.use("/api/v1/disciplinary", disciplinaryRoutes);
+app.use("/api/v1/subject", subjectRoutes);
 
 app.use(helmet());
 app.use(cors());

@@ -57,9 +57,10 @@ CREATE TABLE teachers (
 );
 
 CREATE TABLE teacher_subjects (
-    teacher_id UUID REFERENCES teachers(user_id) ON DELETE CASCADE,
     subject_id UUID REFERENCES subjects(id) ON DELETE CASCADE,
-    PRIMARY KEY (teacher_id, subject_id)
+    class_group class_group_enum NOT NULL,
+    teacher_id UUID REFERENCES teachers(user_id) ON DELETE CASCADE,
+    PRIMARY KEY (subject_id, class_group)
 );
 
 CREATE TABLE secretaries (
