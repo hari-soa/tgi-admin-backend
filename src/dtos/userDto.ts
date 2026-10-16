@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+export type UserRole = "ADMIN" | "TEACHER" | "SECRETARY" | "STUDENT";
+export type ClassGroup = "SECONDE" | "PREMIERE" | "TERMINALE" | "ANCIEN";
+export type Gender = "MALE" | "FEMALE";
+
 export const createAdministratorSchema = z.object({
   body: z.object({
     firstName: z.string().min(2, "First name is required"),
