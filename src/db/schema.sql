@@ -1,8 +1,8 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 CREATE TYPE user_role_enum AS ENUM ('ADMIN', 'TEACHER', 'SECRETARY', 'STUDENT');
-CREATE TYPE gender_enum AS ENUM ('MALE', 'FEMALE', 'OTHER');
-CREATE TYPE class_group_enum AS ENUM ('SECONDE', 'PREMIERE', 'TERMINALE');
+CREATE TYPE gender_enum AS ENUM ('MALE', 'FEMALE');
+CREATE TYPE class_group_enum AS ENUM ('SECONDE', 'PREMIERE', 'TERMINALE', 'ANCIEN');
 
 CREATE TYPE remark_category_enum AS ENUM ('BEHAVIOR', 'ACADEMIC', 'WARNING', 'ENCOURAGEMENT', 'OTHER');
 CREATE TYPE student_history_type_enum AS ENUM ('ABSENCE', 'LATENESS', 'SUSPENSION', 'INFIRMARY', 'EARLY_LEAVE_PERMIT');
@@ -25,8 +25,10 @@ CREATE TABLE users (
     contact_number VARCHAR(30) NOT NULL,
     email VARCHAR(255) UNIQUE,
     password VARCHAR(255) NOT NULL,
+    matricule VARCHAR(50) UNIQUE NOT NULL,
     profile_picture_url TEXT,
     user_type user_role_enum NOT NULL,
+    gender gender_enum NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -34,6 +36,29 @@ CREATE TABLE users (
 CREATE TABLE administrators (
     user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     role VARCHAR(50) NOT NULL DEFAULT 'ADMIN'
+);
+
+CREATE TABLE teachers (
+    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    homeroom_class class_group_enum
+);
+
+CREATE TABLE secretaries (
+    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+);
+
+CREATE TABLE students (
+    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    class_roll_number INT NOT NULL,
+    class_group class_group_enum NOT NULL,
+    date_of_birth DATE NOT NULL,
+    gender gender_enum NOT NULL,
+    address TEXT NOT NULL,
+    parents_email VARCHAR(255) NOT NULL,
+    parents_contact_number VARCHAR(30) NOT NULL,
+    entry_year INT NOT NULL,
+    graduation_year INT,
+    is_active BOOLEAN DEFAULT TRUE
 );
 
 CREATE TABLE subjects (
@@ -51,34 +76,11 @@ CREATE TABLE subject_target_classes (
     PRIMARY KEY (subject_id, target_class)
 );
 
-CREATE TABLE teachers (
-    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    homeroom_class class_group_enum
-);
-
 CREATE TABLE teacher_subjects (
     subject_id UUID REFERENCES subjects(id) ON DELETE CASCADE,
     class_group class_group_enum NOT NULL,
     teacher_id UUID REFERENCES teachers(user_id) ON DELETE CASCADE,
     PRIMARY KEY (subject_id, class_group)
-);
-
-CREATE TABLE secretaries (
-    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    department VARCHAR(100)
-);
-
-CREATE TABLE students (
-    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    class_roll_number INT NOT NULL,
-    class_group class_group_enum NOT NULL, -- Choix unique (Seconde, Première, Terminale)
-    date_of_birth DATE NOT NULL,
-    gender gender_enum NOT NULL,
-    address TEXT NOT NULL,
-    parents_email VARCHAR(255) NOT NULL,
-    parents_contact_number VARCHAR(30) NOT NULL,
-    profile_picture_url TEXT NOT NULL,
-    comments TEXT
 );
 
 CREATE TABLE student_remarks (

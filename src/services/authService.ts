@@ -1,7 +1,8 @@
-import { UserRepository } from "../repositories/userRepository";
+import { userRepository } from "../repositories/userRepository";
 import { generateToken } from "../utils/jwt";
 import { AppError } from "../utils/AppError";
 import { LoginDto } from "../dtos/authDto";
+import bcrypt from "bcrypt";
 
 export interface LoginResult {
   token: string;
@@ -15,16 +16,16 @@ export interface LoginResult {
   redirectUrl: string;
 }
 
-export class AuthService {
-  public static async login(dto: LoginDto): Promise<LoginResult> {
-    const user = await UserRepository.findByEmail(dto.email);
+export const authService = {
+  login: async (dto: LoginDto): Promise<LoginResult> => {
+    const user = await userRepository.findByEmail(dto.email);
 
-    if (!user) {
+    if (!user || !user.password) {
       throw new AppError("Invalid email or matricule", 401);
     }
 
-    const userMatricule = user.matricule || user.password;
-    if (userMatricule !== dto.matricule) {
+    const isPasswordValid = await bcrypt.compare(dto.matricule, user.password);
+    if (!isPasswordValid) {
       throw new AppError("Invalid email or matricule", 401);
     }
 
@@ -47,5 +48,5 @@ export class AuthService {
       },
       redirectUrl,
     };
-  }
-}
+  },
+};

@@ -1,89 +1,93 @@
 import { pool } from "../config/db";
-import { User } from "../models";
+import { User } from "../models/userModel";
 import {
   CreateAdministratorDto,
   CreateStudentDto,
   CreateSecretaryDto,
-} from "../dtos";
+} from "../dtos/userDto";
 
-export class UserRepository {
-  public static async findByEmail(email: string): Promise<User | null> {
+export const userRepository = {
+  findByEmail: async (email: string): Promise<User | null> => {
     const query = `
-      SELECT id, first_name AS "firstName", last_name AS "lastName", email, password, matricule, role, contact_number AS "contactNumber", profile_picture_url AS "profilePictureUrl"
+      SELECT id, first_name AS "firstName", last_name AS "lastName", email, password, matricule, user_type AS "role", contact_number AS "contactNumber", profile_picture_url AS "profilePictureUrl", gender
       FROM users
       WHERE LOWER(email) = LOWER($1)
       LIMIT 1;
     `;
     const { rows } = await pool.query<User>(query, [email]);
     return rows[0] || null;
-  }
+  },
 
-  public static async findById(id: string): Promise<User | null> {
+  findById: async (id: string): Promise<User | null> => {
     const query = `
-      SELECT id, first_name AS "firstName", last_name AS "lastName", email, password, matricule, role, contact_number AS "contactNumber", profile_picture_url AS "profilePictureUrl"
-      FROM users
-      WHERE id = $1
+      SELECT u.id, u.first_name AS "firstName", u.last_name AS "lastName", u.email, u.matricule, u.user_type AS "role", u.contact_number AS "contactNumber", u.profile_picture_url AS "profilePictureUrl", u.gender,
+             s.class_roll_number AS "classRollNumber", s.class_group AS "classGroup", s.entry_year AS "entryYear", s.graduation_year AS "graduationYear", s.is_active AS "isActive"
+      FROM users u
+      LEFT JOIN students s ON u.id = s.user_id
+      WHERE u.id = $1
       LIMIT 1;
     `;
-    const { rows } = await pool.query<User>(query, [id]);
+    const { rows } = await pool.query(query, [id]);
     return rows[0] || null;
-  }
+  },
 
-  public static async findByMatricule(matricule: string): Promise<User | null> {
+  findByMatricule: async (matricule: string): Promise<User | null> => {
     const query = `
-      SELECT id, first_name AS "firstName", last_name AS "lastName", email, password, matricule, role
+      SELECT id, first_name AS "firstName", last_name AS "lastName", email, password, matricule, user_type AS "role", gender
       FROM users
       WHERE matricule = $1
       LIMIT 1;
     `;
     const { rows } = await pool.query<User>(query, [matricule]);
     return rows[0] || null;
-  }
+  },
 
-  public static async createAdministrator(
+  createAdministrator: async (
     data: CreateAdministratorDto,
     matricule: string,
-  ): Promise<User> {
+    hashedPassword: string,
+  ): Promise<User> => {
     const query = `
-      INSERT INTO users (first_name, last_name, password, matricule, contact_number, email, profile_picture_url, role)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      RETURNING id, first_name AS "firstName", last_name AS "lastName", email, matricule, role, contact_number AS "contactNumber", profile_picture_url AS "profilePictureUrl";
+      INSERT INTO users (first_name, last_name, password, matricule, contact_number, email, profile_picture_url, user_type, gender)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, 'ADMIN', 'MALE')
+      RETURNING id, first_name AS "firstName", last_name AS "lastName", email, matricule, user_type AS "role", contact_number AS "contactNumber", profile_picture_url AS "profilePictureUrl";
     `;
     const values = [
       data.firstName,
       data.lastName,
-      data.password,
+      hashedPassword,
       matricule,
       data.contactNumber,
       data.email || null,
       data.profilePictureUrl || null,
-      data.role || "ADMIN",
     ];
     const { rows } = await pool.query<User>(query, values);
     return rows[0];
-  }
+  },
 
-  public static async createStudent(
+  createStudent: async (
     data: CreateStudentDto,
     matricule: string,
-  ): Promise<User> {
+    hashedPassword: string,
+  ): Promise<User> => {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
 
       const userQuery = `
-        INSERT INTO users (first_name, last_name, password, matricule, contact_number, email, profile_picture_url, role)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, 'STUDENT')
-        RETURNING id, first_name AS "firstName", last_name AS "lastName", email, matricule, role, contact_number AS "contactNumber", profile_picture_url AS "profilePictureUrl";
+        INSERT INTO users (first_name, last_name, password, matricule, contact_number, email, profile_picture_url, user_type, gender)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 'STUDENT', $8)
+        RETURNING id, first_name AS "firstName", last_name AS "lastName", email, matricule, user_type AS "role", contact_number AS "contactNumber", profile_picture_url AS "profilePictureUrl", gender;
       `;
       const userValues = [
         data.firstName,
         data.lastName,
-        data.password,
+        hashedPassword,
         matricule,
         data.contactNumber,
         data.email || null,
         data.profilePictureUrl || null,
+        data.gender,
       ];
       const { rows: userRows } = await client.query<User>(
         userQuery,
@@ -92,8 +96,8 @@ export class UserRepository {
       const newUser = userRows[0];
 
       const studentDetailsQuery = `
-        INSERT INTO students (user_id, class_roll_number, class_group, date_of_birth, gender, address, parents_email, parents_contact_number, comments)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);
+        INSERT INTO students (user_id, class_roll_number, class_group, date_of_birth, gender, address, parents_email, parents_contact_number, comments, entry_year, graduation_year, is_active)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, TRUE);
       `;
       const studentValues = [
         newUser.id,
@@ -105,6 +109,8 @@ export class UserRepository {
         data.parentsEmail,
         data.parentsContactNumber,
         data.comments || null,
+        data.entryYear,
+        data.graduationYear || null,
       ];
       await client.query(studentDetailsQuery, studentValues);
 
@@ -116,25 +122,26 @@ export class UserRepository {
     } finally {
       client.release();
     }
-  }
+  },
 
-  public static async createSecretary(
+  createSecretary: async (
     data: CreateSecretaryDto,
     matricule: string,
-  ): Promise<User> {
+    hashedPassword: string,
+  ): Promise<User> => {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
 
       const userQuery = `
-        INSERT INTO users (first_name, last_name, password, matricule, contact_number, email, profile_picture_url, role)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, 'SECRETARY')
-        RETURNING id, first_name AS "firstName", last_name AS "lastName", email, matricule, role, contact_number AS "contactNumber", profile_picture_url AS "profilePictureUrl";
+        INSERT INTO users (first_name, last_name, password, matricule, contact_number, email, profile_picture_url, user_type, gender)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 'SECRETARY', 'FEMALE')
+        RETURNING id, first_name AS "firstName", last_name AS "lastName", email, matricule, user_type AS "role", contact_number AS "contactNumber", profile_picture_url AS "profilePictureUrl";
       `;
       const userValues = [
         data.firstName,
         data.lastName,
-        data.password,
+        hashedPassword,
         matricule,
         data.contactNumber,
         data.email || null,
@@ -163,60 +170,19 @@ export class UserRepository {
     } finally {
       client.release();
     }
-  }
+  },
 
-  public static async findUserWithDetailsById(id: string): Promise<any | null> {
+  findUserWithDetailsById: async (id: string): Promise<any | null> => {
     const query = `
-      SELECT 
-        u.id, u.first_name AS "firstName", u.last_name AS "lastName", u.email, 
-        u.contact_number AS "contactNumber", u.profile_picture_url AS "profilePictureUrl", 
-        u.user_type AS "role",
-        s.class_roll_number AS "classRollNumber", s.class_group AS "classGroup", 
-        s.date_of_birth AS "dateOfBirth", s.gender, s.address, 
-        s.parents_email AS "parentsEmail", s.parents_contact_number AS "parentsContactNumber", s.comments,
-        sec.department,
-        t.homeroom_class AS "homeroomClass",
-        
-        -- Récupération de l'historique disciplinaire si c'est un étudiant
-        COALESCE((
-          SELECT json_agg(json_build_object(
-            'id', h.id,
-            'type', h.type,
-            'startDate', h.start_date,
-            'endDate', h.end_date,
-            'reason', h.reason,
-            'createdAt', h.created_at
-          ) ORDER BY h.created_at DESC)
-          FROM student_history_records h
-          WHERE h.student_id = u.id
-        ), '[]'::json) AS "historyRecords",
-
-        -- Récupération des remarques si c'est un étudiant
-        COALESCE((
-          SELECT json_agg(json_build_object(
-            'id', r.id,
-            'category', r.category,
-            'content', r.content,
-            'authorRole', r.author_role,
-            'createdAt', r.created_at
-          ) ORDER BY r.created_at DESC)
-          FROM student_remarks r
-          WHERE r.student_id = u.id
-        ), '[]'::json) AS "remarks",
-
-        -- Récupération des matières enseignées si c'est un professeur
-        COALESCE((
-          SELECT json_agg(json_build_object(
-            'subjectId', sub.id,
-            'subjectName', sub.name,
-            'coefficient', sub.coefficient,
-            'classGroup', tsc.class_group
-          ))
-          FROM teacher_subject_classes tsc
-          JOIN subjects sub ON tsc.subject_id = sub.id
-          WHERE tsc.teacher_id = u.id
-        ), '[]'::json) AS "subjectsTeaching"
-
+      SELECT u.id, u.first_name AS "firstName", u.last_name AS "lastName", u.email, 
+             u.contact_number AS "contactNumber", u.profile_picture_url AS "profilePictureUrl", 
+             u.user_type AS "role", u.matricule, u.gender,
+             s.class_roll_number AS "classRollNumber", s.class_group AS "classGroup", 
+             s.date_of_birth AS "dateOfBirth", s.address, 
+             s.parents_email AS "parentsEmail", s.parents_contact_number AS "parentsContactNumber", s.comments,
+             s.entry_year AS "entryYear", s.graduation_year AS "graduationYear", s.is_active AS "isActive",
+             sec.department,
+             t.homeroom_class AS "homeroomClass"
       FROM users u
       LEFT JOIN administrators a ON u.id = a.user_id
       LEFT JOIN students s ON u.id = s.user_id
@@ -227,19 +193,9 @@ export class UserRepository {
     `;
     const { rows } = await pool.query(query, [id]);
     return rows[0] || null;
-  }
+  },
 
-  public static async updateUserBase(
-    id: string,
-    data: {
-      firstName?: string;
-      lastName?: string;
-      email?: string;
-      password?: string;
-      contactNumber?: string;
-      profilePictureUrl?: string;
-    },
-  ): Promise<void> {
+  updateUserBase: async (id: string, data: any): Promise<void> => {
     const fields: string[] = [];
     const values: any[] = [];
     let idx = 1;
@@ -260,12 +216,9 @@ export class UserRepository {
     values.push(id);
     const query = `UPDATE users SET ${fields.join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE id = $${idx};`;
     await pool.query(query, values);
-  }
+  },
 
-  public static async updateStudentDetails(
-    userId: string,
-    data: any,
-  ): Promise<void> {
+  updateStudentDetails: async (userId: string, data: any): Promise<void> => {
     const fields: string[] = [];
     const values: any[] = [];
     let idx = 1;
@@ -279,6 +232,7 @@ export class UserRepository {
       parentsEmail: "parents_email",
       parentsContactNumber: "parents_contact_number",
       comments: "comments",
+      graduationYear: "graduation_year",
     };
 
     for (const [key, dbCol] of Object.entries(mapping)) {
@@ -293,29 +247,30 @@ export class UserRepository {
       const query = `UPDATE students SET ${fields.join(", ")} WHERE user_id = $${idx};`;
       await pool.query(query, values);
     }
-  }
+  },
 
-  public static async updateSecretaryDetails(
-    userId: string,
-    data: any,
-  ): Promise<void> {
+  updateSecretaryDetails: async (userId: string, data: any): Promise<void> => {
     if (data.department !== undefined) {
       await pool.query(
         `UPDATE secretaries SET department = $1 WHERE user_id = $2;`,
         [data.department, userId],
       );
     }
-  }
+  },
 
-  public static async updateTeacherDetails(
-    userId: string,
-    data: any,
-  ): Promise<void> {
+  updateTeacherDetails: async (userId: string, data: any): Promise<void> => {
     if (data.homeroomClass !== undefined) {
       await pool.query(
         `UPDATE teachers SET homeroom_class = $1 WHERE user_id = $2;`,
         [data.homeroomClass, userId],
       );
     }
-  }
-}
+  },
+
+  deactivateStudent: async (userId: string): Promise<void> => {
+    await pool.query(
+      `UPDATE students SET is_active = FALSE WHERE user_id = $1;`,
+      [userId],
+    );
+  },
+};
