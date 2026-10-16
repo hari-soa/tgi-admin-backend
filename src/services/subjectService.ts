@@ -1,12 +1,12 @@
-import { SubjectRepository } from "../repositories/subjectRepository";
-import { UserRepository } from "../repositories/userRepository";
-import { CreateSubjectDto, UpdateSubjectDto } from "../dtos/subjectDto";
+import { subjectRepository } from "../repositories/subjectRepository";
+import { userRepository } from "../repositories/userRepository";
+import { CreateSubjectDto } from "../dtos/subjectDto";
 import { AppError } from "../utils/AppError";
 
-export class SubjectService {
-  public static async createSubject(dto: CreateSubjectDto) {
+export const subjectService = {
+  createSubject: async (dto: CreateSubjectDto) => {
     for (const assignment of dto.assignments) {
-      const teacher = await UserRepository.findById(assignment.teacherId);
+      const teacher = await userRepository.findById(assignment.teacherId);
       if (!teacher || teacher.role !== "TEACHER") {
         throw new AppError(
           `Teacher with ID ${assignment.teacherId} not found or is not a teacher`,
@@ -14,26 +14,36 @@ export class SubjectService {
         );
       }
     }
-    return SubjectRepository.create(dto);
-  }
+    try {
+      return await subjectRepository.create(dto);
+    } catch (error: any) {
+      if (
+        error.message &&
+        error.message.includes("already exists and is active")
+      ) {
+        throw new AppError(error.message, 400);
+      }
+      throw error;
+    }
+  },
 
-  public static async getAllSubjects() {
-    return SubjectRepository.findAll();
-  }
+  getAllSubjects: async () => {
+    return subjectRepository.findAll();
+  },
 
-  public static async getSubjectById(id: string) {
-    const subject = await SubjectRepository.findById(id);
+  getSubjectById: async (id: string) => {
+    const subject = await subjectRepository.findById(id);
     if (!subject) {
       throw new AppError("Subject not found", 404);
     }
     return subject;
-  }
+  },
 
-  public static async deleteSubject(id: string) {
-    const subject = await SubjectRepository.findById(id);
+  deleteSubject: async (id: string) => {
+    const subject = await subjectRepository.findById(id);
     if (!subject) {
       throw new AppError("Subject not found", 404);
     }
-    await SubjectRepository.delete(id);
-  }
-}
+    await subjectRepository.deactivate(id);
+  },
+};

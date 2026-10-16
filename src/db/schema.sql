@@ -63,12 +63,16 @@ CREATE TABLE students (
 
 CREATE TABLE subjects (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(100) NOT NULL UNIQUE,
+    name VARCHAR(100) NOT NULL,
     coefficient NUMERIC(3, 1) NOT NULL,
     description TEXT,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE UNIQUE INDEX unique_active_subject_per_class 
+ON subject_target_classes (subject_id, target_class); 
 
 CREATE TABLE subject_target_classes (
     subject_id UUID REFERENCES subjects(id) ON DELETE CASCADE,
