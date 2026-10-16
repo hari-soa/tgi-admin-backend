@@ -1,15 +1,15 @@
 import { Request, Response, NextFunction } from "express";
-import { ScheduleService } from "../services/scheduleService";
+import { scheduleService } from "../services/scheduleService";
 
-export class ScheduleController {
-  public static async create(
+export const scheduleController = {
+  create: async (
     req: Request<{}, {}, any> & { user?: { userId: string } },
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
       const adminId = req.user!.userId;
-      const timetable = await ScheduleService.createTimetable(
+      const timetable = await scheduleService.createTimetable(
         req.body,
         adminId,
       );
@@ -21,46 +21,46 @@ export class ScheduleController {
     } catch (error) {
       next(error);
     }
-  }
+  },
 
-  public static async getAll(
+  getAll: async (
     req: Request,
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
-      const timetables = await ScheduleService.getAllTimetables();
+      const timetables = await scheduleService.getAllTimetables();
       res.status(200).json({ status: "success", data: { timetables } });
     } catch (error) {
       next(error);
     }
-  }
+  },
 
-  public static async getById(
+  getById: async (
     req: Request<{ id: string }>,
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
-      const timetable = await ScheduleService.getTimetableById(req.params.id);
+      const timetable = await scheduleService.getTimetableById(req.params.id);
       res.status(200).json({ status: "success", data: { timetable } });
     } catch (error) {
       next(error);
     }
-  }
+  },
 
-  public static async delete(
+  delete: async (
     req: Request<{ id: string }>,
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
-      await ScheduleService.deleteTimetable(req.params.id);
+      await scheduleService.deleteTimetable(req.params.id);
       res
         .status(200)
         .json({ status: "success", message: "Timetable deleted successfully" });
     } catch (error) {
       next(error);
     }
-  }
-}
+  },
+};

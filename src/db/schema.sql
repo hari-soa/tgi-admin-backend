@@ -147,6 +147,25 @@ CREATE TABLE exam_event_subject_details (
     PRIMARY KEY (event_id, subject_id)
 );
 
+CREATE TABLE school_events (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    type VARCHAR(100) NOT NULL,
+    title VARCHAR(150) NOT NULL,
+    description TEXT,
+    start_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    end_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    location VARCHAR(150),
+    created_by_admin_id UUID NOT NULL REFERENCES administrators(user_id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE school_event_target_classes (
+    event_id UUID REFERENCES school_events(id) ON DELETE CASCADE,
+    target_class class_group_enum NOT NULL,
+    PRIMARY KEY (event_id, target_class)
+);
+
 CREATE TABLE grades (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     student_id UUID NOT NULL REFERENCES students(user_id) ON DELETE CASCADE,

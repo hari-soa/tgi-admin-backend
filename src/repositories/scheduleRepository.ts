@@ -1,11 +1,8 @@
 import { pool } from "../config/db";
 import { CreateTimetableDto } from "../dtos/scheduleDto";
 
-export class ScheduleRepository {
-  public static async create(
-    dto: CreateTimetableDto,
-    adminId: string,
-  ): Promise<any> {
+export const scheduleRepository = {
+  create: async (dto: CreateTimetableDto, adminId: string): Promise<any> => {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
@@ -20,17 +17,14 @@ export class ScheduleRepository {
         dto.academicYear,
       ]);
       const timetable = rows[0];
+
       for (const event of dto.events) {
-        const eventQuery = `
-          INSERT INTO schedule_events (timetable_id, type, start_time, end_time, classroom, label, location, subject_id, teacher_id, created_by_admin_id)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-          RETURNING id;
-        `;
         let classroom = null;
         let label = null;
         let location = null;
         let subjectId = null;
         let teacherId = null;
+
         if (event.type === "COURSE") {
           classroom = event.classroom;
           subjectId = event.subjectId;
@@ -42,7 +36,12 @@ export class ScheduleRepository {
           location = event.location;
         }
 
-        const eventValues = [
+        const eventQuery = `
+          INSERT INTO schedule_events (timetable_id, type, start_time, end_time, classroom, label, location, subject_id, teacher_id, created_by_admin_id)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          RETURNING id;
+        `;
+        const eventResult = await client.query(eventQuery, [
           timetable.id,
           event.type,
           event.startTime,
@@ -53,10 +52,9 @@ export class ScheduleRepository {
           subjectId,
           teacherId,
           adminId,
-        ];
-
-        const eventResult = await client.query(eventQuery, eventValues);
+        ]);
         const eventId = eventResult.rows[0].id;
+
         if (event.type === "COURSE") {
           await client.query(
             `INSERT INTO schedule_event_target_classes (event_id, target_class) VALUES ($1, $2);`,
@@ -84,44 +82,42 @@ export class ScheduleRepository {
           }
         }
       }
+
       await client.query("COMMIT");
-      return this.findById(timetable.id);
+      return scheduleRepository.findById(timetable.id);
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;
     } finally {
       client.release();
     }
-  }
+  },
 
-  public static async findById(id: string): Promise<any | null> {
-    const query = `
-      SELECT 
-        t.id, t.title, t.academic_year AS "academicYear", t.created_at AS "createdAt",
-        COALESCE((
-          SELECT json_agg(json_build_object(
-            'id', e.id,
-            'type', e.type,
-            'startTime', e.start_time,
-            'endTime', e.end_time,
-            'classroom', e.classroom,
-            'label', e.label,
-            'location', e.location,
-            'subjectId', e.subject_id,
-            'teacherId', e.teacher_id
-          ))
-          FROM schedule_events e
-          WHERE e.timetable_id = t.id
-        ), '[]'::json) AS events
-      FROM timetables t
-      WHERE t.id = $1
+  findById: async (id: string): Promise<any | null> => {
+    const timetableQuery = `
+      SELECT id, title, academic_year AS "academicYear", created_at AS "createdAt"
+      FROM timetables
+      WHERE id = $1
       LIMIT 1;
     `;
-    const { rows } = await pool.query(query, [id]);
-    return rows[0] || null;
-  }
+    const timetableResult = await pool.query(timetableQuery, [id]);
+    if (timetableResult.rows.length === 0) return null;
 
-  public static async findAll(): Promise<any[]> {
+    const timetable = timetableResult.rows[0];
+
+    const eventsQuery = `
+      SELECT id, type, start_time AS "startTime", end_time AS "endTime", 
+             classroom, label, location, subject_id AS "subjectId", teacher_id AS "teacherId"
+      FROM schedule_events
+      WHERE timetable_id = $1;
+    `;
+    const eventsResult = await pool.query(eventsQuery, [id]);
+    timetable.events = eventsResult.rows;
+
+    return timetable;
+  },
+
+  findAll: async (): Promise<any[]> => {
     const query = `
       SELECT id, title, academic_year AS "academicYear", created_at AS "createdAt"
       FROM timetables
@@ -129,9 +125,9 @@ export class ScheduleRepository {
     `;
     const { rows } = await pool.query(query);
     return rows;
-  }
+  },
 
-  public static async delete(id: string): Promise<void> {
+  delete: async (id: string): Promise<void> => {
     await pool.query(`DELETE FROM timetables WHERE id = $1;`, [id]);
-  }
-}
+  },
+};
