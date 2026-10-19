@@ -4,6 +4,7 @@ import {
   UpdateAnnualResultDto,
 } from "../dtos/resultDto";
 import { AppError } from "../utils/AppError";
+import { pdfService } from "./pdfService";
 
 export const resultService = {
   createResult: async (dto: CreateAnnualResultDto, secretaryId: string) => {
@@ -40,5 +41,35 @@ export const resultService = {
 
   getStudentHistory: async (studentId: string) => {
     return resultRepository.findByStudentId(studentId);
+  },
+
+  generateAndExportPdf: async (
+    resultId: string,
+    requestingUser: { userId: string; role: string },
+  ) => {
+    // 1. Récupérer le bulletin
+    const result = await resultRepository.findById(resultId);
+    if (!result) {
+      throw new AppError("Annual result not found", 404);
+    }
+
+    if (requestingUser.role === "STUDENT") {
+      if (result.studentId !== requestingUser.userId) {
+        throw new AppError(
+          "Forbidden: You can only export your own bulletin",
+          403,
+        );
+      }
+      if (result.status !== "PUBLISHED") {
+        throw new AppError("Forbidden: Bulletin is not published yet", 403);
+      }
+    }
+
+    const studentName = "Nom de l'élève";
+    const pdfUrl = await pdfService.generateBulletinPdf(result, studentName);
+
+    await resultRepository.updatePdfExportUrl(resultId, pdfUrl);
+
+    return { pdfUrl };
   },
 };

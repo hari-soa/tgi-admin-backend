@@ -131,4 +131,13 @@ export const resultRepository = {
     const { rows } = await pool.query(query, [studentId]);
     return rows;
   },
+
+  updatePdfExportUrl: async (id: string, pdfUrl: string): Promise<void> => {
+    const query = `
+    UPDATE annual_results
+    SET pdf_export_url = $1, updated_at = CURRENT_TIMESTAMP
+    WHERE id = $2;
+  `;
+    await pool.query(query, [pdfUrl, id]);
+  },
 };

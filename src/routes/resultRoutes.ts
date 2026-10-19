@@ -24,4 +24,6 @@ router.post(
 
 router.patch("/:id/review", authorize("ADMIN"), resultController.review);
 
+router.get("/:id/pdf", resultController.exportPdf);
+
 export default router;

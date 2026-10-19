@@ -79,4 +79,28 @@ export const resultController = {
       next(error);
     }
   },
+
+  exportPdf: async (
+    req: Request<{ id: string }> & { user?: { userId: string; role: string } },
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const resultId = req.params.id;
+      const requestingUser = req.user!;
+
+      const { pdfUrl } = await resultService.generateAndExportPdf(
+        resultId,
+        requestingUser,
+      );
+
+      res.status(200).json({
+        status: "success",
+        message: "Bulletin PDF generated successfully",
+        data: { pdfUrl },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
 };
