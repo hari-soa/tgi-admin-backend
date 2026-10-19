@@ -3,11 +3,10 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TYPE user_role_enum AS ENUM ('ADMIN', 'TEACHER', 'SECRETARY', 'STUDENT');
 CREATE TYPE gender_enum AS ENUM ('MALE', 'FEMALE');
 CREATE TYPE class_group_enum AS ENUM ('SECONDE', 'PREMIERE', 'TERMINALE', 'ANCIEN');
+CREATE TYPE attendance_status_enum AS ENUM ('PRESENT', 'LATE', 'ABSENT');
 
 CREATE TYPE remark_category_enum AS ENUM ('BEHAVIOR', 'ACADEMIC', 'WARNING', 'ENCOURAGEMENT', 'OTHER');
 CREATE TYPE student_history_type_enum AS ENUM ('ABSENCE', 'LATENESS', 'SUSPENSION', 'INFIRMARY', 'EARLY_LEAVE_PERMIT');
-
-CREATE TYPE event_type_enum AS ENUM ('COURSE', 'EXAM', 'OTHER');
 
 CREATE TYPE exam_type_enum AS ENUM ('SEMI_TRIMESTER', 'TRIMESTER');
 CREATE TYPE term_enum AS ENUM ('FIRST_TRIMESTER', 'SECOND_TRIMESTER', 'THIRD_TRIMESTER');
@@ -110,61 +109,36 @@ CREATE TABLE student_history_records (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE timetables (
+CREATE TABLE teacher_attendance_slots (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    title VARCHAR(150) NOT NULL,
-    academic_year VARCHAR(20) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE schedule_events (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    timetable_id UUID REFERENCES timetables(id) ON DELETE CASCADE,
-    type event_type_enum NOT NULL,
-    start_time TIMESTAMP WITH TIME ZONE NOT NULL,
-    end_time TIMESTAMP WITH TIME ZONE NOT NULL,
-    classroom VARCHAR(50),
-    label VARCHAR(150), -- Utilisé pour OTHER
-    location VARCHAR(150), -- Utilisé pour OTHER
-    subject_id UUID REFERENCES subjects(id) ON DELETE SET NULL, -- Pour COURSE
-    teacher_id UUID REFERENCES teachers(user_id) ON DELETE SET NULL, -- Pour COURSE
-    created_by_admin_id UUID NOT NULL REFERENCES administrators(user_id),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE schedule_event_target_classes (
-    event_id UUID REFERENCES schedule_events(id) ON DELETE CASCADE,
+    teacher_id UUID NOT NULL REFERENCES teachers(user_id) ON DELETE CASCADE,
+    subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
     target_class class_group_enum NOT NULL,
-    PRIMARY KEY (event_id, target_class)
-);
-
-CREATE TABLE exam_event_subject_details (
-    event_id UUID REFERENCES schedule_events(id) ON DELETE CASCADE,
-    subject_id UUID REFERENCES subjects(id) ON DELETE CASCADE,
-    duration_in_minutes INT NOT NULL,
-    PRIMARY KEY (event_id, subject_id)
-);
-
-CREATE TABLE school_events (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    type VARCHAR(100) NOT NULL,
-    title VARCHAR(150) NOT NULL,
-    description TEXT,
-    start_time TIMESTAMP WITH TIME ZONE NOT NULL,
-    end_time TIMESTAMP WITH TIME ZONE NOT NULL,
-    location VARCHAR(150),
-    created_by_admin_id UUID NOT NULL REFERENCES administrators(user_id),
+    day_of_week VARCHAR(15) NOT NULL, -- 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    classroom VARCHAR(50) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE school_event_target_classes (
-    event_id UUID REFERENCES school_events(id) ON DELETE CASCADE,
-    target_class class_group_enum NOT NULL,
-    PRIMARY KEY (event_id, target_class)
+CREATE TABLE teacher_attendances (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    slot_id UUID NOT NULL REFERENCES teacher_attendance_slots(id) ON DELETE CASCADE,
+    attendance_date DATE NOT NULL,
+    status attendance_status_enum NOT NULL DEFAULT 'PRESENT',
+    actual_check_in_time TIMESTAMP WITH TIME ZONE,
+    late_duration_minutes INT DEFAULT 0,
+    motif TEXT, -- Saisissable et modifiable UNIQUEMENT par un ADMIN
+    recorded_by UUID NOT NULL REFERENCES users(id), -- Admin ou Secrétaire
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT unique_slot_per_day UNIQUE (slot_id, attendance_date)
 );
+
+CREATE INDEX idx_teacher_attendance_slots_teacher ON teacher_attendance_slots(teacher_id);
+CREATE INDEX idx_teacher_attendance_slots_day ON teacher_attendance_slots(day_of_week);
+CREATE INDEX idx_teacher_attendances_date ON teacher_attendances(attendance_date);
 
 CREATE TABLE grades (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
