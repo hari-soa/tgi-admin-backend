@@ -12,7 +12,7 @@ CREATE TYPE exam_type_enum AS ENUM ('SEMI_TRIMESTER', 'TRIMESTER');
 CREATE TYPE term_enum AS ENUM ('FIRST_TRIMESTER', 'SECOND_TRIMESTER', 'THIRD_TRIMESTER');
 
 CREATE TYPE result_status_enum AS ENUM ('DRAFT', 'APPROVED', 'PUBLISHED');
-CREATE TYPE academic_decision_enum AS ENUM ('PASS', 'FAIL', 'PENDING');
+CREATE TYPE academic_decision_enum AS ENUM ('PROMOTE', 'REPEAT', 'ORIENTED', 'PENDING');
 
 CREATE TYPE target_scope_enum AS ENUM ('ALL', 'CLASS', 'TEACHERS_ONLY', 'STUDENTS_ONLY');
 CREATE TYPE announcement_priority_enum AS ENUM ('NORMAL', 'URGENT');
@@ -175,7 +175,8 @@ CREATE TABLE annual_results (
 CREATE TABLE annual_result_subject_breakdowns (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     annual_result_id UUID NOT NULL REFERENCES annual_results(id) ON DELETE CASCADE,
-    subject_id UUID NOT NULL REFERENCES subjects(id),
+    subject_id UUID REFERENCES subjects(id) ON DELETE SET NULL, 
+    subject_name VARCHAR(100) NOT NULL, 
     coefficient NUMERIC(3, 1) NOT NULL,
     term1_semi_trimester_grade NUMERIC(4, 2),
     term1_trimester_grade NUMERIC(4, 2),
