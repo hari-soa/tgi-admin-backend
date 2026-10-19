@@ -1,82 +1,78 @@
 import { Request, Response, NextFunction } from "express";
-import { GradeService } from "../services/gradeService";
+import { gradeService } from "../services/gradeService";
 
-export class GradeController {
-  public static async transcribe(
+export const gradeController = {
+  create: async (
     req: Request<{}, {}, any> & { user?: { userId: string } },
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
       const secretaryId = req.user!.userId;
-      const grade = await GradeService.transcribeGrade(req.body, secretaryId);
+      const grade = await gradeService.createGrade(req.body, secretaryId);
       res.status(201).json({
         status: "success",
-        message: "Grade transcribed successfully (pending approval)",
+        message: "Grade created successfully as draft",
         data: { grade },
       });
     } catch (error) {
       next(error);
     }
-  }
+  },
 
-  public static async createAnnualResult(
+  submitSession: async (
     req: Request<{}, {}, any> & { user?: { userId: string } },
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
       const secretaryId = req.user!.userId;
-      const result = await GradeService.submitAnnualResult(
-        req.body,
-        secretaryId,
-      );
+      const grades = await gradeService.submitSession(req.body, secretaryId);
       res.status(201).json({
         status: "success",
-        message: "Annual result created successfully",
-        data: { result },
+        message: "Grade session submitted successfully (pending admin review)",
+        data: { grades },
       });
     } catch (error) {
       next(error);
     }
-  }
+  },
 
-  public static async reviewResult(
-    req: Request<{ id: string }, {}, { status: any; decision: any }> & {
+  review: async (
+    req: Request<{ id: string }, {}, { status: string }> & {
       user?: { userId: string };
     },
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
       const adminId = req.user!.userId;
-      const { status, decision } = req.body;
-      const result = await GradeService.reviewAnnualResult(
+      const { status } = req.body;
+      const grade = await gradeService.reviewGrade(
         req.params.id,
         status,
-        decision,
         adminId,
       );
       res.status(200).json({
         status: "success",
-        message: "Annual result status and decision updated successfully",
-        data: { result },
+        message: "Grade status updated successfully",
+        data: { grade },
       });
     } catch (error) {
       next(error);
     }
-  }
+  },
 
-  public static async getById(
+  getById: async (
     req: Request<{ id: string }>,
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
-      const result = await GradeService.getResultById(req.params.id);
-      res.status(200).json({ status: "success", data: { result } });
+      const grade = await gradeService.getGradeById(req.params.id);
+      res.status(200).json({ status: "success", data: { grade } });
     } catch (error) {
       next(error);
     }
-  }
-}
+  },
+};

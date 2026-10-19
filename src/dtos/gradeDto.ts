@@ -1,17 +1,21 @@
 import { z } from "zod";
+import { classGroupEnum } from "./studentDto";
 
 export const examTypeEnum = ["SEMI_TRIMESTER", "TRIMESTER"] as const;
+export const termEnum = [
+  "FIRST_TRIMESTER",
+  "SECOND_TRIMESTER",
+  "THIRD_TRIMESTER",
+] as const;
+export const gradeStatusEnum = ["DRAFT", "PENDING", "PUBLISHED"] as const;
 
 export const createGradeSchema = z.object({
   body: z.object({
     studentId: z.string({ message: "Student ID is required" }),
     subjectId: z.string({ message: "Subject ID is required" }),
-    classGroup: z.string({ message: "Class group is required" }),
-    createdBySecretaryId: z.string({ message: "Secretary ID is required" }),
+    classGroup: z.enum(classGroupEnum, { message: "Invalid class group" }),
     examType: z.enum(examTypeEnum, { message: "Invalid exam type" }),
-    term: z.union([z.literal(1), z.literal(2), z.literal(3)], {
-      message: "Term must be 1, 2, or 3",
-    }),
+    term: z.enum(termEnum, { message: "Invalid term" }),
     value: z
       .number({ message: "Grade value must be a number" })
       .min(0, "Grade value cannot be negative"),
@@ -25,18 +29,35 @@ export const createGradeSchema = z.object({
   }),
 });
 
-export const updateGradeSchema = z.object({
+export const submitGradeSessionSchema = z.object({
+  body: z.object({
+    classGroup: z.enum(classGroupEnum, { message: "Invalid class group" }),
+    subjectId: z.string({ message: "Subject ID is required" }),
+    examType: z.enum(examTypeEnum, { message: "Invalid exam type" }),
+    term: z.enum(termEnum, { message: "Invalid term" }),
+    grades: z
+      .array(
+        z.object({
+          studentId: z.string({ message: "Student ID is required" }),
+          value: z.number().min(0),
+          maxScore: z.number().positive().default(20),
+        }),
+      )
+      .min(1, "At least one grade is required"),
+  }),
+});
+
+export const reviewGradeSchema = z.object({
   params: z.object({
     id: z.string({ message: "Grade ID parameter is required" }),
   }),
   body: z.object({
-    value: z.number().min(0).optional(),
-    maxScore: z.number().positive().optional(),
-    examType: z.enum(examTypeEnum).optional(),
-    term: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
-    evaluationDate: z.coerce.date().optional(),
+    status: z.enum(gradeStatusEnum, { message: "Invalid status" }),
   }),
 });
 
 export type CreateGradeDto = z.infer<typeof createGradeSchema>["body"];
-export type UpdateGradeDto = z.infer<typeof updateGradeSchema>["body"];
+export type SubmitGradeSessionDto = z.infer<
+  typeof submitGradeSessionSchema
+>["body"];
+export type ReviewGradeDto = z.infer<typeof reviewGradeSchema>["body"];

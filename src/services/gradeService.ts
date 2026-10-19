@@ -1,42 +1,30 @@
-import { GradeRepository } from "../repositories/gradeRepository";
-import { CreateAnnualResultDto } from "../dtos/resultDto";
+import { gradeRepository } from "../repositories/gradeRepository";
+import { CreateGradeDto, SubmitGradeSessionDto } from "../dtos/gradeDto";
 import { AppError } from "../utils/AppError";
 
-export class GradeService {
-  public static async transcribeGrade(data: any, secretaryId: string) {
-    return GradeRepository.createGrade({ ...data, secretaryId });
-  }
+export const gradeService = {
+  createGrade: async (dto: CreateGradeDto, secretaryId: string) => {
+    return gradeRepository.create(dto, secretaryId);
+  },
 
-  public static async submitAnnualResult(
-    dto: CreateAnnualResultDto,
-    secretaryId: string,
-  ) {
-    return GradeRepository.createAnnualResult(dto, secretaryId);
-  }
+  submitSession: async (dto: SubmitGradeSessionDto, secretaryId: string) => {
+    return gradeRepository.submitSession(dto, secretaryId);
+  },
 
-  public static async reviewAnnualResult(
-    id: string,
-    status: "APPROVED" | "PUBLISHED" | "DRAFT",
-    decision: "PASS" | "FAIL" | "PENDING",
-    adminId: string,
-  ) {
-    const updated = await GradeRepository.updateAnnualResultStatusAndDecision(
-      id,
-      status,
-      decision,
-      adminId,
-    );
-    if (!updated) {
-      throw new AppError("Annual result not found", 404);
+  reviewGrade: async (id: string, status: string, adminId: string) => {
+    const grade = await gradeRepository.findById(id);
+    if (!grade) {
+      throw new AppError("Grade not found", 404);
     }
+    const updated = await gradeRepository.updateStatus(id, status, adminId);
     return updated;
-  }
+  },
 
-  public static async getResultById(id: string) {
-    const result = await GradeRepository.findAnnualResultById(id);
-    if (!result) {
-      throw new AppError("Annual result not found", 404);
+  getGradeById: async (id: string) => {
+    const grade = await gradeRepository.findById(id);
+    if (!grade) {
+      throw new AppError("Grade not found", 404);
     }
-    return result;
-  }
-}
+    return grade;
+  },
+};
