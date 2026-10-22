@@ -1,33 +1,33 @@
-import { AnnouncementRepository } from "../repositories/announcementRepository";
+import { announcementRepository } from "../repositories/announcementRepository";
 import { CreateAnnouncementDto } from "../dtos/announcementDto";
 import { AppError } from "../utils/AppError";
 
-export class AnnouncementService {
-  public static async createAnnouncement(
+export const announcementService = {
+  createAnnouncement: async (
     dto: CreateAnnouncementDto,
     authorId: string,
     targetClasses?: string[],
-  ) {
-    return AnnouncementRepository.create(dto, authorId, targetClasses);
-  }
+  ) => {
+    return announcementRepository.create(dto, authorId, targetClasses);
+  },
 
-  public static async getAllAnnouncements() {
-    return AnnouncementRepository.findAll();
-  }
+  getAllAnnouncements: async () => {
+    return announcementRepository.findAll();
+  },
 
-  public static async getAnnouncementById(id: string) {
-    const announcement = await AnnouncementRepository.findById(id);
+  getAnnouncementById: async (id: string) => {
+    const announcement = await announcementRepository.findById(id);
     if (!announcement) {
       throw new AppError("Announcement not found", 404);
     }
     return announcement;
-  }
+  },
 
-  public static async deleteAnnouncement(id: string) {
-    const announcement = await AnnouncementRepository.findById(id);
+  deleteAnnouncement: async (id: string) => {
+    const announcement = await announcementRepository.findById(id);
     if (!announcement) {
       throw new AppError("Announcement not found", 404);
     }
-    await AnnouncementRepository.delete(id);
-  }
-}
+    await announcementRepository.delete(id);
+  },
+};

@@ -14,7 +14,7 @@ CREATE TYPE term_enum AS ENUM ('FIRST_TRIMESTER', 'SECOND_TRIMESTER', 'THIRD_TRI
 CREATE TYPE result_status_enum AS ENUM ('DRAFT', 'APPROVED', 'PUBLISHED');
 CREATE TYPE academic_decision_enum AS ENUM ('PROMOTE', 'REPEAT', 'ORIENTED', 'PENDING');
 
-CREATE TYPE target_scope_enum AS ENUM ('ALL', 'CLASS', 'TEACHERS_ONLY', 'STUDENTS_ONLY');
+CREATE TYPE target_scope_enum AS ENUM ('ALL', 'CLASS');
 CREATE TYPE announcement_priority_enum AS ENUM ('NORMAL', 'URGENT');
 
 CREATE TABLE users (

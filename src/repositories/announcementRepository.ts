@@ -1,12 +1,12 @@
 import { pool } from "../config/db";
 import { CreateAnnouncementDto } from "../dtos/announcementDto";
 
-export class AnnouncementRepository {
-  public static async create(
+export const announcementRepository = {
+  create: async (
     dto: CreateAnnouncementDto,
     authorId: string,
     targetClasses?: string[],
-  ): Promise<any> {
+  ): Promise<any> => {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
@@ -48,9 +48,9 @@ export class AnnouncementRepository {
     } finally {
       client.release();
     }
-  }
+  },
 
-  public static async findAll(): Promise<any[]> {
+  findAll: async (): Promise<any[]> => {
     const query = `
       SELECT 
         a.id, a.title, a.content, a.target_scope AS "targetScope", 
@@ -62,9 +62,9 @@ export class AnnouncementRepository {
     `;
     const { rows } = await pool.query(query);
     return rows;
-  }
+  },
 
-  public static async findById(id: string): Promise<any | null> {
+  findById: async (id: string): Promise<any | null> => {
     const query = `
       SELECT 
         a.id, a.title, a.content, a.target_scope AS "targetScope", 
@@ -77,9 +77,9 @@ export class AnnouncementRepository {
     `;
     const { rows } = await pool.query(query, [id]);
     return rows[0] || null;
-  }
+  },
 
-  public static async delete(id: string): Promise<void> {
+  delete: async (id: string): Promise<void> => {
     await pool.query(`DELETE FROM announcements WHERE id = $1;`, [id]);
-  }
-}
+  },
+};

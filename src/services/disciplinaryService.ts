@@ -1,10 +1,10 @@
 import { DisciplinaryRepository } from "../repositories/disciplinaryRepository";
-import { UserRepository } from "../repositories/userRepository";
+import { userRepository } from "../repositories/userRepository";
 import { AppError } from "../utils/AppError";
 
 export class DisciplinaryService {
   public static async addHistoryRecord(dto: any, adminId: string) {
-    const student = await UserRepository.findById(dto.studentId);
+    const student = await userRepository.findById(dto.studentId);
     if (!student || student.role !== "STUDENT") {
       throw new AppError("Student not found", 404);
     }
@@ -35,7 +35,7 @@ export class DisciplinaryService {
     authorId: string,
     authorRole: string,
   ) {
-    const student = await UserRepository.findById(dto.studentId);
+    const student = await userRepository.findById(dto.studentId);
     if (!student || student.role !== "STUDENT") {
       throw new AppError("Student not found", 404);
     }
