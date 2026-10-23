@@ -1,11 +1,18 @@
 import { z } from "zod";
 
 export const resultStatusEnum = ["DRAFT", "APPROVED", "PUBLISHED"] as const;
-export const academicDecisionEnum = ["PASS", "FAIL", "PENDING"] as const;
+export const academicDecisionEnum = [
+  "PROMOTE",
+  "REPEAT",
+  "ORIENTED",
+  "PENDING",
+] as const;
 
 export const subjectGradeBreakdownSchema = z.object({
   subjectId: z.string({ message: "Subject ID is required" }),
-  subjectName: z.string().optional(),
+  subjectName: z.string({
+    message: "Subject name is required for historical tracking",
+  }),
   coefficient: z
     .number({ message: "Coefficient is required" })
     .positive("Coefficient must be greater than 0"),

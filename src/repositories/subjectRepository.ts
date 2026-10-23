@@ -1,16 +1,34 @@
 import { pool } from "../config/db";
-import { CreateSubjectDto, UpdateSubjectDto } from "../dtos/subjectDto";
+import { CreateSubjectDto } from "../dtos/subjectDto";
 
-export class SubjectRepository {
-  public static async create(dto: CreateSubjectDto): Promise<any> {
+export const subjectRepository = {
+  create: async (dto: CreateSubjectDto): Promise<any> => {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
+      for (const assignment of dto.assignments) {
+        const checkQuery = `
+          SELECT s.id 
+          FROM subjects s
+          JOIN subject_target_classes stc ON s.id = stc.subject_id
+          WHERE LOWER(s.name) = LOWER($1) AND stc.target_class = $2 AND s.is_active = TRUE
+          LIMIT 1;
+        `;
+        const existing = await client.query(checkQuery, [
+          dto.name,
+          assignment.classGroup,
+        ]);
+        if (existing.rows.length > 0) {
+          throw new Error(
+            `Subject '${dto.name}' already exists and is active for class '${assignment.classGroup}'`,
+          );
+        }
+      }
 
       const subjectQuery = `
-        INSERT INTO subjects (name, coefficient, description)
-        VALUES ($1, $2, $3)
-        RETURNING id, name, coefficient, description, created_at AS "createdAt";
+        INSERT INTO subjects (name, coefficient, description, is_active)
+        VALUES ($1, $2, $3, TRUE)
+        RETURNING id, name, coefficient, description, is_active AS "isActive", created_at AS "createdAt";
       `;
       const { rows } = await client.query(subjectQuery, [
         dto.name,
@@ -25,7 +43,6 @@ export class SubjectRepository {
           [subject.id, assignment.classGroup],
         );
 
-        // Association du prof pour cette classe
         await client.query(
           `INSERT INTO teacher_subject_classes (subject_id, class_group, teacher_id) VALUES ($1, $2, $3)
            ON CONFLICT (subject_id, class_group) DO UPDATE SET teacher_id = EXCLUDED.teacher_id;`,
@@ -33,61 +50,71 @@ export class SubjectRepository {
         );
       }
       await client.query("COMMIT");
-      return this.findById(subject.id);
+      return subjectRepository.findById(subject.id);
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;
     } finally {
       client.release();
     }
-  }
+  },
 
-  public static async findById(id: string): Promise<any | null> {
-    const query = `
-      SELECT 
-        s.id, s.name, s.coefficient, s.description, s.created_at AS "createdAt",
-        COALESCE((
-          SELECT json_agg(json_build_object(
-            'classGroup', tsc.class_group,
-            'teacherId', tsc.teacher_id,
-            'teacherFirstName', u.first_name,
-            'teacherLastName', u.last_name
-          ))
-          FROM teacher_subject_classes tsc
-          JOIN users u ON tsc.teacher_id = u.id
-          WHERE tsc.subject_id = s.id
-        ), '[]'::json) AS assignments
-      FROM subjects s
-      WHERE s.id = $1
+  findById: async (id: string): Promise<any | null> => {
+    const subjectQuery = `
+      SELECT id, name, coefficient, description, is_active AS "isActive", created_at AS "createdAt"
+      FROM subjects
+      WHERE id = $1
       LIMIT 1;
     `;
-    const { rows } = await pool.query(query, [id]);
-    return rows[0] || null;
-  }
+    const subjectResult = await pool.query(subjectQuery, [id]);
+    if (subjectResult.rows.length === 0) return null;
 
-  public static async findAll(): Promise<any[]> {
-    const query = `
-      SELECT 
-        s.id, s.name, s.coefficient, s.description, s.created_at AS "createdAt",
-        COALESCE((
-          SELECT json_agg(json_build_object(
-            'classGroup', tsc.class_group,
-            'teacherId', tsc.teacher_id,
-            'teacherFirstName', u.first_name,
-            'teacherLastName', u.last_name
-          ))
-          FROM teacher_subject_classes tsc
-          JOIN users u ON tsc.teacher_id = u.id
-          WHERE tsc.subject_id = s.id
-        ), '[]'::json) AS assignments
-      FROM subjects s
-      ORDER BY s.name ASC;
+    const subject = subjectResult.rows[0];
+
+    const assignmentsQuery = `
+      SELECT tsc.class_group AS "classGroup", tsc.teacher_id AS "teacherId", 
+             u.first_name AS "teacherFirstName", u.last_name AS "teacherLastName"
+      FROM teacher_subject_classes tsc
+      JOIN users u ON tsc.teacher_id = u.id
+      WHERE tsc.subject_id = $1;
     `;
-    const { rows } = await pool.query(query);
-    return rows;
-  }
+    const assignmentsResult = await pool.query(assignmentsQuery, [id]);
+    subject.assignments = assignmentsResult.rows;
 
-  public static async delete(id: string): Promise<void> {
-    await pool.query(`DELETE FROM subjects WHERE id = $1;`, [id]);
-  }
-}
+    return subject;
+  },
+
+  findAll: async (): Promise<any[]> => {
+    const subjectsQuery = `
+      SELECT id, name, coefficient, description, is_active AS "isActive", created_at AS "createdAt"
+      FROM subjects
+      WHERE is_active = TRUE
+      ORDER BY name ASC;
+    `;
+    const subjectsResult = await pool.query(subjectsQuery);
+    const subjects = subjectsResult.rows;
+
+    for (const subject of subjects) {
+      const assignmentsQuery = `
+        SELECT tsc.class_group AS "classGroup", tsc.teacher_id AS "teacherId", 
+               u.first_name AS "teacherFirstName", u.last_name AS "teacherLastName"
+        FROM teacher_subject_classes tsc
+        JOIN users u ON tsc.teacher_id = u.id
+        WHERE tsc.subject_id = $1;
+      `;
+      const assignmentsResult = await pool.query(assignmentsQuery, [
+        subject.id,
+      ]);
+      subject.assignments = assignmentsResult.rows;
+    }
+
+    return subjects;
+  },
+
+  deactivate: async (id: string): Promise<void> => {
+    await pool.query(
+      `UPDATE subjects SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = $1;`,
+      [id],
+    );
+  },
+};

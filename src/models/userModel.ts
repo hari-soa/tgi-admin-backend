@@ -1,3 +1,7 @@
+export type UserRole = "ADMIN" | "TEACHER" | "SECRETARY" | "STUDENT";
+export type Gender = "MALE" | "FEMALE";
+export type ClassGroup = "SECONDE" | "PREMIERE" | "TERMINALE" | "ANCIEN";
+
 export interface User {
   id: string;
   firstName: string;
@@ -5,8 +9,9 @@ export interface User {
   contactNumber: string;
   email?: string;
   password?: string;
-  matricule?: string;
-  role: "ADMIN" | "STUDENT" | "SECRETARY" | "TEACHER";
+  matricule: string;
+  role: UserRole;
+  gender: Gender;
   profilePictureUrl?: string;
   createdAt?: Date;
   updatedAt?: Date;

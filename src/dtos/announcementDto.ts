@@ -1,13 +1,13 @@
 import { z } from "zod";
 
-export const targetScopeEnum = [
-  "ALL",
-  "CLASS",
-  "TEACHERS_ONLY",
-  "STUDENTS_ONLY",
-] as const;
-
+export const targetScopeEnum = ["ALL", "CLASS"] as const;
 export const announcementPriorityEnum = ["NORMAL", "URGENT"] as const;
+export const classGroupEnum = [
+  "SECONDE",
+  "PREMIERE",
+  "TERMINALE",
+  "ANCIEN",
+] as const;
 
 export const createAnnouncementSchema = z.object({
   body: z.object({
@@ -18,7 +18,6 @@ export const createAnnouncementSchema = z.object({
     content: z
       .string({ message: "Content is required" })
       .min(10, "Content must be at least 10 characters long"),
-    authorId: z.string({ message: "Author ID is required" }),
     targetScope: z.enum(targetScopeEnum, {
       message: "Invalid target scope",
     }),
@@ -28,6 +27,7 @@ export const createAnnouncementSchema = z.object({
         message: "Invalid priority level",
       })
       .default("NORMAL"),
+    targetClasses: z.array(z.enum(classGroupEnum)).optional(),
   }),
 });
 
@@ -41,6 +41,7 @@ export const updateAnnouncementSchema = z.object({
     targetScope: z.enum(targetScopeEnum).optional(),
     targetValue: z.string().optional(),
     priority: z.enum(announcementPriorityEnum).optional(),
+    targetClasses: z.array(z.enum(classGroupEnum)).optional(),
   }),
 });
 

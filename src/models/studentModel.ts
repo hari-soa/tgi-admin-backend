@@ -1,12 +1,5 @@
 import { User } from "./userModel";
-import { StudentHistoryRecord } from "./studentHistoryModel";
-import { ClassGroup } from "./classGroupEnum";
-
-export enum Gender {
-  MALE = "MALE",
-  FEMALE = "FEMALE",
-  OTHER = "OTHER",
-}
+import { ClassGroup, Gender } from "../dtos/userDto";
 
 export interface Student extends User {
   classRollNumber: number;
@@ -18,5 +11,7 @@ export interface Student extends User {
   parentsContactNumber: string;
   profilePictureUrl: string;
   comments?: string;
-  historyRecords?: StudentHistoryRecord[];
+  entryYear: number;
+  graduationYear?: number;
+  isActive: boolean;
 }

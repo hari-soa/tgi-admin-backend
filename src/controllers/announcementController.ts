@@ -1,16 +1,16 @@
 import { Request, Response, NextFunction } from "express";
-import { AnnouncementService } from "../services/announcementService";
+import { announcementService } from "../services/announcementService";
 
-export class AnnouncementController {
-  public static async create(
+export const announcementController = {
+  create: async (
     req: Request<{}, {}, any> & { user?: { userId: string } },
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
       const authorId = req.user!.userId;
       const { targetClasses, ...dto } = req.body;
-      const announcement = await AnnouncementService.createAnnouncement(
+      const announcement = await announcementService.createAnnouncement(
         dto,
         authorId,
         targetClasses,
@@ -24,15 +24,15 @@ export class AnnouncementController {
     } catch (error) {
       next(error);
     }
-  }
+  },
 
-  public static async getAll(
+  getAll: async (
     req: Request,
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
-      const announcements = await AnnouncementService.getAllAnnouncements();
+      const announcements = await announcementService.getAllAnnouncements();
       res.status(200).json({
         status: "success",
         data: { announcements },
@@ -40,15 +40,15 @@ export class AnnouncementController {
     } catch (error) {
       next(error);
     }
-  }
+  },
 
-  public static async getById(
+  getById: async (
     req: Request<{ id: string }>,
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
-      const announcement = await AnnouncementService.getAnnouncementById(
+      const announcement = await announcementService.getAnnouncementById(
         req.params.id,
       );
       res.status(200).json({
@@ -58,15 +58,15 @@ export class AnnouncementController {
     } catch (error) {
       next(error);
     }
-  }
+  },
 
-  public static async delete(
+  delete: async (
     req: Request<{ id: string }>,
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
-      await AnnouncementService.deleteAnnouncement(req.params.id);
+      await announcementService.deleteAnnouncement(req.params.id);
       res.status(200).json({
         status: "success",
         message: "Announcement deleted successfully",
@@ -74,5 +74,5 @@ export class AnnouncementController {
     } catch (error) {
       next(error);
     }
-  }
-}
+  },
+};

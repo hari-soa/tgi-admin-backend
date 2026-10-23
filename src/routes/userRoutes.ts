@@ -1,42 +1,42 @@
 import { Router } from "express";
-import { UserController } from "../controllers/userController";
+import { userController } from "../controllers/userController";
 import { authenticate, authorize } from "../middlewares/authMiddleware";
 import { validate } from "../middlewares/validateMiddlewares";
 import {
   createAdministratorSchema,
   createStudentSchema,
   createSecretarySchema,
-} from "../dtos";
+} from "../dtos/userDto";
 
 const router = Router();
 
 router.use(authenticate);
 
-router.get("/me", UserController.getMyProfile);
+router.get("/me", userController.getMyProfile);
 
 router.post(
   "/admin",
   authorize("ADMIN"),
   validate(createAdministratorSchema),
-  UserController.createAdministrator,
+  userController.createAdministrator,
 );
 
 router.post(
-  "/student",
+  "/students",
   authorize("ADMIN", "SECRETARY"),
   validate(createStudentSchema),
-  UserController.createStudent,
+  userController.createStudent,
 );
 
 router.post(
   "/secretary",
   authorize("ADMIN"),
   validate(createSecretarySchema),
-  UserController.createSecretary,
+  userController.createSecretary,
 );
 
-router.get("/:id", authorize("ADMIN", "SECRETARY"), UserController.getUserById);
-
-router.patch("/:id", authorize("ADMIN"), UserController.updateUser);
+router.get("/:id", authorize("ADMIN", "SECRETARY"), userController.getUserById);
+router.patch("/:id", authorize("ADMIN"), userController.updateUser);
+router.delete("/:id", authorize("ADMIN"), userController.deactivateStudent);
 
 export default router;

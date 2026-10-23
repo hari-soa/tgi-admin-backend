@@ -1,10 +1,9 @@
-export enum StudentHistoryType {
-  ABSENCE = "ABSENCE",
-  LATENESS = "LATENESS",
-  SUSPENSION = "SUSPENSION",
-  INFIRMARY = "INFIRMARY",
-  EARLY_LEAVE_PERMIT = "EARLY_LEAVE_PERMIT",
-}
+export type StudentHistoryType =
+  | "ABSENCE"
+  | "LATENESS"
+  | "SUSPENSION"
+  | "INFIRMARY"
+  | "EARLY_LEAVE_PERMIT";
 
 export interface StudentHistoryRecord {
   id: string;

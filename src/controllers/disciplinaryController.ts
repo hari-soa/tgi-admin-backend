@@ -1,15 +1,15 @@
 import { Request, Response, NextFunction } from "express";
-import { DisciplinaryService } from "../services/disciplinaryService";
+import { disciplinaryService } from "../services/disciplinaryService";
 
-export class DisciplinaryController {
-  public static async createHistoryRecord(
+export const disciplinaryController = {
+  createHistoryRecord: async (
     req: Request<{}, {}, any> & { user?: { userId: string } },
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
       const adminId = req.user!.userId;
-      const record = await DisciplinaryService.addHistoryRecord(
+      const record = await disciplinaryService.addHistoryRecord(
         req.body,
         adminId,
       );
@@ -22,15 +22,15 @@ export class DisciplinaryController {
     } catch (error) {
       next(error);
     }
-  }
+  },
 
-  public static async updateHistoryRecord(
+  updateHistoryRecord: async (
     req: Request<{ id: string }>,
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
-      const record = await DisciplinaryService.updateHistoryRecord(
+      const record = await disciplinaryService.updateHistoryRecord(
         req.params.id,
         req.body,
       );
@@ -42,15 +42,15 @@ export class DisciplinaryController {
     } catch (error) {
       next(error);
     }
-  }
+  },
 
-  public static async deleteHistoryRecord(
+  deleteHistoryRecord: async (
     req: Request<{ id: string }>,
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
-      await DisciplinaryService.deleteHistoryRecord(req.params.id);
+      await disciplinaryService.deleteHistoryRecord(req.params.id);
       res.status(200).json({
         status: "success",
         message: "Student history record deleted successfully",
@@ -58,17 +58,17 @@ export class DisciplinaryController {
     } catch (error) {
       next(error);
     }
-  }
+  },
 
-  public static async createRemark(
+  createRemark: async (
     req: Request<{}, {}, any> & { user?: { userId: string; role: string } },
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
       const authorId = req.user!.userId;
       const authorRole = req.user!.role;
-      const remark = await DisciplinaryService.addRemark(
+      const remark = await disciplinaryService.addRemark(
         req.body,
         authorId,
         authorRole,
@@ -82,15 +82,15 @@ export class DisciplinaryController {
     } catch (error) {
       next(error);
     }
-  }
+  },
 
-  public static async updateRemark(
+  updateRemark: async (
     req: Request<{ id: string }>,
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
-      const remark = await DisciplinaryService.updateRemark(
+      const remark = await disciplinaryService.updateRemark(
         req.params.id,
         req.body,
       );
@@ -102,15 +102,15 @@ export class DisciplinaryController {
     } catch (error) {
       next(error);
     }
-  }
+  },
 
-  public static async deleteRemark(
+  deleteRemark: async (
     req: Request<{ id: string }>,
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
-      await DisciplinaryService.deleteRemark(req.params.id);
+      await disciplinaryService.deleteRemark(req.params.id);
       res.status(200).json({
         status: "success",
         message: "Student remark deleted successfully",
@@ -118,5 +118,5 @@ export class DisciplinaryController {
     } catch (error) {
       next(error);
     }
-  }
-}
+  },
+};

@@ -3,17 +3,17 @@ import {
   CreateAdministratorDto,
   CreateStudentDto,
   CreateSecretaryDto,
-} from "../dtos";
-import { UserService } from "../services/userService";
+} from "../dtos/userDto";
+import { userService } from "../services/userService";
 
-export class UserController {
-  public static async createAdministrator(
+export const userController = {
+  createAdministrator: async (
     req: Request<{}, {}, CreateAdministratorDto>,
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
-      const user = await UserService.createAdministrator(req.body);
+      const user = await userService.createAdministrator(req.body);
       res.status(201).json({
         status: "success",
         message: "Administrator created successfully",
@@ -22,15 +22,15 @@ export class UserController {
     } catch (error) {
       next(error);
     }
-  }
+  },
 
-  public static async createStudent(
+  createStudent: async (
     req: Request<{}, {}, CreateStudentDto>,
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
-      const user = await UserService.createStudent(req.body);
+      const user = await userService.createStudent(req.body);
       res.status(201).json({
         status: "success",
         message: "Student created successfully",
@@ -39,15 +39,15 @@ export class UserController {
     } catch (error) {
       next(error);
     }
-  }
+  },
 
-  public static async createSecretary(
+  createSecretary: async (
     req: Request<{}, {}, CreateSecretaryDto>,
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
-      const user = await UserService.createSecretary(req.body);
+      const user = await userService.createSecretary(req.body);
       res.status(201).json({
         status: "success",
         message: "Secretary created successfully",
@@ -56,15 +56,15 @@ export class UserController {
     } catch (error) {
       next(error);
     }
-  }
+  },
 
-  public static async getUserById(
+  getUserById: async (
     req: Request<{ id: string }>,
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
-      const user = await UserService.getUserById(req.params.id);
+      const user = await userService.getUserById(req.params.id);
       res.status(200).json({
         status: "success",
         data: { user },
@@ -72,16 +72,16 @@ export class UserController {
     } catch (error) {
       next(error);
     }
-  }
+  },
 
-  public static async getMyProfile(
+  getMyProfile: async (
     req: Request & { user?: { userId: string; role: string } },
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
       const requester = req.user!;
-      const user = await UserService.getUserProfile(
+      const user = await userService.getUserProfile(
         requester.userId,
         requester,
       );
@@ -92,35 +92,17 @@ export class UserController {
     } catch (error) {
       next(error);
     }
-  }
+  },
 
-  public static async getUserProfile(
-    req: Request<{ id: string }> & { user?: { userId: string; role: string } },
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
-    try {
-      const targetId = req.params.id;
-      const requester = req.user!;
-      const user = await UserService.getUserProfile(targetId, requester);
-      res.status(200).json({
-        status: "success",
-        data: { user },
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  public static async updateUser(
+  updateUser: async (
     req: Request<{ id: string }, {}, any> & { user?: { role: string } },
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
       const targetId = req.params.id;
       const requesterRole = req.user!.role;
-      const updatedUser = await UserService.updateUser(
+      const updatedUser = await userService.updateUser(
         targetId,
         req.body,
         requesterRole,
@@ -134,5 +116,19 @@ export class UserController {
     } catch (error) {
       next(error);
     }
-  }
-}
+  },
+
+  deactivateStudent: async (
+    req: Request<{ id: string }> & { user?: { role: string } },
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const targetId = req.params.id;
+      await userService.deactivateStudent(targetId);
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  },
+};

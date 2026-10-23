@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const genderEnum = ["MALE", "FEMALE", "OTHER"] as const;
+export const genderEnum = ["MALE", "FEMALE"] as const;
 export const classGroupEnum = ["SECONDE", "PREMIERE", "TERMINALE"] as const;
 
 export const createStudentSchema = z.object({
@@ -23,10 +23,7 @@ export const createStudentSchema = z.object({
     classGroup: z.enum(classGroupEnum, {
       message: "Invalid class group option",
     }),
-    dateOfBirth: z
-      .string({ message: "Date of birth is required" })
-      .datetime()
-      .or(z.date()),
+    dateOfBirth: z.string({ message: "Date of birth is required" }),
     gender: z.enum(genderEnum, { message: "Invalid gender option" }),
     address: z.string({ message: "Address is required" }),
     parentsEmail: z
@@ -37,6 +34,8 @@ export const createStudentSchema = z.object({
     parentsContactNumber: z.string({
       message: "Parents contact number is required",
     }),
+    entryYear: z.number({ message: "Entry year is required" }).int().min(2000),
+    graduationYear: z.number().int().optional(),
     comments: z.string().optional(),
   }),
 });
@@ -54,12 +53,14 @@ export const updateStudentSchema = z.object({
     profilePictureUrl: z.string().url().optional(),
     classRollNumber: z.number().int().positive().optional(),
     classGroup: z.enum(classGroupEnum).optional(),
-    dateOfBirth: z.string().datetime().or(z.date()).optional(),
+    dateOfBirth: z.string().optional(),
     gender: z.enum(genderEnum).optional(),
     address: z.string().optional(),
     parentsEmail: z.string().email().trim().toLowerCase().optional(),
     parentsContactNumber: z.string().optional(),
     comments: z.string().optional(),
+    graduationYear: z.number().int().optional(),
+    isActive: z.boolean().optional(),
   }),
 });
 

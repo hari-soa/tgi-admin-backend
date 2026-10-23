@@ -1,8 +1,6 @@
 export enum TargetScope {
   ALL = "ALL",
   CLASS = "CLASS",
-  TEACHERS_ONLY = "TEACHERS_ONLY",
-  STUDENTS_ONLY = "STUDENTS_ONLY",
 }
 
 export enum AnnouncementPriority {

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { DisciplinaryController } from "../controllers/disciplinaryController";
+import { disciplinaryController } from "../controllers/disciplinaryController";
 import { authenticate, authorize } from "../middlewares/authMiddleware";
 import { validate } from "../middlewares/validateMiddlewares";
 import {
@@ -19,41 +19,40 @@ router.post(
   "/history",
   authorize("ADMIN"),
   validate(createStudentHistoryRecordSchema),
-  DisciplinaryController.createHistoryRecord,
+  disciplinaryController.createHistoryRecord,
 );
 
 router.patch(
   "/history/:id",
   authorize("ADMIN"),
   validate(updateStudentHistoryRecordSchema),
-  DisciplinaryController.updateHistoryRecord,
+  disciplinaryController.updateHistoryRecord,
 );
 
 router.delete(
   "/history/:id",
   authorize("ADMIN"),
-  DisciplinaryController.deleteHistoryRecord,
+  disciplinaryController.deleteHistoryRecord,
 );
 
-// --- Remarques (100% ADMIN) ---
 router.post(
   "/remarks",
   authorize("ADMIN"),
   validate(createStudentRemarkSchema),
-  DisciplinaryController.createRemark,
+  disciplinaryController.createRemark,
 );
 
 router.patch(
   "/remarks/:id",
   authorize("ADMIN"),
   validate(updateStudentRemarkSchema),
-  DisciplinaryController.updateRemark,
+  disciplinaryController.updateRemark,
 );
 
 router.delete(
   "/remarks/:id",
   authorize("ADMIN"),
-  DisciplinaryController.deleteRemark,
+  disciplinaryController.deleteRemark,
 );
 
 export default router;

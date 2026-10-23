@@ -22,6 +22,7 @@ export const createStudentHistoryRecordSchema = z.object({
       .trim(),
   }),
 });
+
 export const updateStudentHistoryRecordSchema = z.object({
   params: z.object({
     id: z.string({ message: "Record ID parameter is required" }),
@@ -37,7 +38,6 @@ export const updateStudentHistoryRecordSchema = z.object({
 export type CreateStudentHistoryRecordDto = z.infer<
   typeof createStudentHistoryRecordSchema
 >["body"];
-
 export type UpdateStudentHistoryRecordDto = z.infer<
   typeof updateStudentHistoryRecordSchema
 >["body"];

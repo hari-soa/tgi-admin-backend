@@ -1,14 +1,14 @@
 import { pool } from "../config/db";
 
-export class DisciplinaryRepository {
-  public static async createHistoryRecord(data: {
+export const disciplinaryRepository = {
+  createHistoryRecord: async (data: {
     studentId: string;
     type: string;
     startDate: Date;
     endDate: Date;
     reason: string;
     adminId: string;
-  }): Promise<any> {
+  }): Promise<any> => {
     const query = `
       INSERT INTO student_history_records (student_id, type, start_date, end_date, reason, created_by_admin_id)
       VALUES ($1, $2, $3, $4, $5, $6)
@@ -24,9 +24,9 @@ export class DisciplinaryRepository {
     ];
     const { rows } = await pool.query(query, values);
     return rows[0];
-  }
+  },
 
-  public static async updateHistoryRecord(id: string, data: any): Promise<any> {
+  updateHistoryRecord: async (id: string, data: any): Promise<any> => {
     const fields: string[] = [];
     const values: any[] = [];
     let idx = 1;
@@ -56,21 +56,21 @@ export class DisciplinaryRepository {
     `;
     const { rows } = await pool.query(query, values);
     return rows[0] || null;
-  }
+  },
 
-  public static async deleteHistoryRecord(id: string): Promise<void> {
+  deleteHistoryRecord: async (id: string): Promise<void> => {
     await pool.query(`DELETE FROM student_history_records WHERE id = $1;`, [
       id,
     ]);
-  }
+  },
 
-  public static async createRemark(data: {
+  createRemark: async (data: {
     studentId: string;
     authorId: string;
     authorRole: string;
     category: string;
     content: string;
-  }): Promise<any> {
+  }): Promise<any> => {
     const query = `
       INSERT INTO student_remarks (student_id, author_id, author_role, category, content)
       VALUES ($1, $2, $3, $4, $5)
@@ -85,9 +85,9 @@ export class DisciplinaryRepository {
     ];
     const { rows } = await pool.query(query, values);
     return rows[0];
-  }
+  },
 
-  public static async updateRemark(id: string, data: any): Promise<any> {
+  updateRemark: async (id: string, data: any): Promise<any> => {
     const fields: string[] = [];
     const values: any[] = [];
     let idx = 1;
@@ -115,9 +115,9 @@ export class DisciplinaryRepository {
     `;
     const { rows } = await pool.query(query, values);
     return rows[0] || null;
-  }
+  },
 
-  public static async deleteRemark(id: string): Promise<void> {
+  deleteRemark: async (id: string): Promise<void> => {
     await pool.query(`DELETE FROM student_remarks WHERE id = $1;`, [id]);
-  }
-}
+  },
+};

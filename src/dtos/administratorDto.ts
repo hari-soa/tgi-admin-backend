@@ -13,7 +13,7 @@ export const createAdministratorSchema = z.object({
       .toLowerCase()
       .optional(),
     profilePictureUrl: z.string().url().optional(),
-    role: z.string({ message: "Role is required" }).optional(),
+    role: z.string().optional(),
   }),
 });
 

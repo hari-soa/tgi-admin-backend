@@ -1,10 +1,9 @@
-export enum RemarkCategory {
-  BEHAVIOR = "BEHAVIOR",
-  ACADEMIC = "ACADEMIC",
-  WARNING = "WARNING",
-  ENCOURAGEMENT = "ENCOURAGEMENT",
-  OTHER = "OTHER",
-}
+export type RemarkCategory =
+  | "BEHAVIOR"
+  | "ACADEMIC"
+  | "WARNING"
+  | "ENCOURAGEMENT"
+  | "OTHER";
 
 export interface StudentRemark {
   id: string;

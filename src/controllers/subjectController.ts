@@ -1,14 +1,14 @@
 import { Request, Response, NextFunction } from "express";
-import { SubjectService } from "../services/subjectService";
+import { subjectService } from "../services/subjectService";
 
-export class SubjectController {
-  public static async create(
+export const subjectController = {
+  create: async (
     req: Request,
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
-      const subject = await SubjectService.createSubject(req.body);
+      const subject = await subjectService.createSubject(req.body);
       res.status(201).json({
         status: "success",
         message: "Subject created successfully",
@@ -17,46 +17,46 @@ export class SubjectController {
     } catch (error) {
       next(error);
     }
-  }
+  },
 
-  public static async getAll(
+  getAll: async (
     req: Request,
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
-      const subjects = await SubjectService.getAllSubjects();
+      const subjects = await subjectService.getAllSubjects();
       res.status(200).json({ status: "success", data: { subjects } });
     } catch (error) {
       next(error);
     }
-  }
+  },
 
-  public static async getById(
+  getById: async (
     req: Request<{ id: string }>,
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
-      const subject = await SubjectService.getSubjectById(req.params.id);
+      const subject = await subjectService.getSubjectById(req.params.id);
       res.status(200).json({ status: "success", data: { subject } });
     } catch (error) {
       next(error);
     }
-  }
+  },
 
-  public static async delete(
+  delete: async (
     req: Request<{ id: string }>,
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
-      await SubjectService.deleteSubject(req.params.id);
+      await subjectService.deleteSubject(req.params.id);
       res
         .status(200)
         .json({ status: "success", message: "Subject deleted successfully" });
     } catch (error) {
       next(error);
     }
-  }
-}
+  },
+};

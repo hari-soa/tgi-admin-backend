@@ -1,28 +1,38 @@
 import { Router } from "express";
-import { GradeController } from "../controllers/gradeController";
+import { gradeController } from "../controllers/gradeController";
 import { authenticate, authorize } from "../middlewares/authMiddleware";
 import { validate } from "../middlewares/validateMiddlewares";
-import { createAnnualResultSchema } from "../dtos/resultDto";
+import {
+  createGradeSchema,
+  submitGradeSessionSchema,
+  reviewGradeSchema,
+} from "../dtos/gradeDto";
 
 const router = Router();
 
 router.use(authenticate);
 
-router.get("/:id", GradeController.getById);
-
-router.post("/transcribe", authorize("SECRETARY"), GradeController.transcribe);
+router.get("/:id", gradeController.getById);
 
 router.post(
-  "/annual-results",
+  "/",
   authorize("SECRETARY"),
-  validate(createAnnualResultSchema),
-  GradeController.createAnnualResult,
+  validate(createGradeSchema),
+  gradeController.create,
+);
+
+router.post(
+  "/session",
+  authorize("SECRETARY"),
+  validate(submitGradeSessionSchema),
+  gradeController.submitSession,
 );
 
 router.patch(
-  "/annual-results/:id/review",
+  "/:id/review",
   authorize("ADMIN"),
-  GradeController.reviewResult,
+  validate(reviewGradeSchema),
+  gradeController.review,
 );
 
 export default router;

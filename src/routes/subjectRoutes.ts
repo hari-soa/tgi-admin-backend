@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { SubjectController } from "../controllers/subjectController";
+import { subjectController } from "../controllers/subjectController";
 import { authenticate, authorize } from "../middlewares/authMiddleware";
 import { validate } from "../middlewares/validateMiddlewares";
 import { createSubjectSchema } from "../dtos/subjectDto";
@@ -8,16 +8,16 @@ const router = Router();
 
 router.use(authenticate);
 
-router.get("/", SubjectController.getAll);
-router.get("/:id", SubjectController.getById);
+router.get("/", subjectController.getAll);
+router.get("/:id", subjectController.getById);
 
 router.post(
   "/",
   authorize("ADMIN"),
   validate(createSubjectSchema),
-  SubjectController.create,
+  subjectController.create,
 );
 
-router.delete("/:id", authorize("ADMIN"), SubjectController.delete);
+router.delete("/:id", authorize("ADMIN"), subjectController.delete);
 
 export default router;

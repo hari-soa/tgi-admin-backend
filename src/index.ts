@@ -9,7 +9,7 @@ import userRoutes from "./routes/userRoutes";
 import announcementRoutes from "./routes/announcementRoutes";
 import disciplinaryRoutes from "./routes/disciplinaryRoutes";
 import subjectRoutes from "./routes/subjectRoutes";
-import scheduleRoutes from "./routes/scheduleRoutes";
+import teacherAttendanceRoutes from "./routes/teacherAttendanceRoutes";
 import gradeRoutes from "./routes/gradeRoutes";
 
 const app = express();
@@ -20,7 +20,7 @@ app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/announcements", announcementRoutes);
 app.use("/api/v1/disciplinary", disciplinaryRoutes);
 app.use("/api/v1/subject", subjectRoutes);
-app.use("/api/v1/schedule", scheduleRoutes);
+app.use("/api/v1/teacherAttendance", teacherAttendanceRoutes);
 app.use("/api/v1/grade", gradeRoutes);
 
 app.use(helmet());
