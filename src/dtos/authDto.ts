@@ -8,7 +8,7 @@ export const loginSchema = z.object({
       .trim()
       .toLowerCase(),
     matricule: z
-      .string({ message: "Matricule (password) is required" })
+      .string({ message: "Matricule is required" })
       .trim()
       .min(1, "Matricule cannot be empty"),
   }),

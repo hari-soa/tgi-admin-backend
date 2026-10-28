@@ -25,9 +25,9 @@ app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/announcements", announcementRoutes);
 app.use("/api/v1/disciplinary", disciplinaryRoutes);
-app.use("/api/v1/subject", subjectRoutes);
+app.use("/api/v1/subjects", subjectRoutes);
 app.use("/api/v1/teacherAttendance", teacherAttendanceRoutes);
-app.use("/api/v1/grade", gradeRoutes);
+app.use("/api/v1/grades", gradeRoutes);
 
 app.all(/(.*)/, (req, _res, next) => {
   next(new AppError(`Cannot find ${req.originalUrl} on this server!`, 404));
