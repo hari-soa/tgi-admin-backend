@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+export * from "./studentDto";
+export * from "./teacherDto";
+export * from "./secretaryDto";
+export * from "./administratorDto";
+
 export type UserRole = "ADMIN" | "TEACHER" | "SECRETARY" | "STUDENT";
 export type ClassGroup = "SECONDE" | "PREMIERE" | "TERMINALE" | "ANCIEN";
 export type Gender = "MALE" | "FEMALE";
