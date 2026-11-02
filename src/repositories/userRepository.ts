@@ -10,11 +10,11 @@ import {
 export const userRepository = {
   getAllUsers: async (): Promise<User[]> => {
     const query = `
-      SELECT u.id, u.first_name AS "firstName", u.last_name AS "lastName", u.email, 
-             u.contact_number AS "contactNumber", u.profile_picture_url AS "profilePictureUrl", 
-             u.user_type AS "role", u.matricule, u.gender, u.created_at AS "createdAt"
-      FROM users u
-      ORDER BY u.created_at DESC;
+      SELECT id, first_name AS "firstName", last_name AS "lastName", email, 
+             contact_number AS "contactNumber", profile_picture_url AS "profilePictureUrl", 
+             user_type AS "role", matricule, gender, created_at AS "createdAt"
+      FROM users
+      ORDER BY created_at DESC;
     `;
     const { rows } = await pool.query<User>(query);
     return rows;
@@ -60,22 +60,44 @@ export const userRepository = {
     matricule: string,
     hashedPassword: string,
   ): Promise<User> => {
-    const query = `
-      INSERT INTO users (first_name, last_name, password, matricule, contact_number, email, profile_picture_url, user_type, gender)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 'ADMIN', 'MALE')
-      RETURNING id, first_name AS "firstName", last_name AS "lastName", email, matricule, user_type AS "role", contact_number AS "contactNumber", profile_picture_url AS "profilePictureUrl";
-    `;
-    const values = [
-      data.firstName,
-      data.lastName,
-      hashedPassword,
-      matricule,
-      data.contactNumber,
-      data.email || null,
-      data.profilePictureUrl || null,
-    ];
-    const { rows } = await pool.query<User>(query, values);
-    return rows[0];
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const userQuery = `
+        INSERT INTO users (first_name, last_name, password, matricule, contact_number, email, profile_picture_url, user_type, gender)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 'ADMIN', 'MALE')
+        RETURNING id, first_name AS "firstName", last_name AS "lastName", email, matricule, user_type AS "role", contact_number AS "contactNumber", profile_picture_url AS "profilePictureUrl";
+      `;
+      const userValues = [
+        data.firstName,
+        data.lastName,
+        hashedPassword,
+        matricule,
+        data.contactNumber,
+        data.email || null,
+        data.profilePictureUrl || null,
+      ];
+      const { rows: userRows } = await client.query<User>(
+        userQuery,
+        userValues,
+      );
+      const newUser = userRows[0];
+
+      const adminDetailsQuery = `
+        INSERT INTO administrators (user_id, role)
+        VALUES ($1, 'ADMIN');
+      `;
+      await client.query(adminDetailsQuery, [newUser.id]);
+
+      await client.query("COMMIT");
+      return newUser;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   },
 
   createStudent: async (
@@ -188,7 +210,7 @@ export const userRepository = {
   createTeacher: async (
     data: CreateTeacherDto,
     matricule: string,
-    dummyHashedPassword: string,
+    hashedPassword: string,
   ): Promise<User> => {
     const client = await pool.connect();
     try {
@@ -202,7 +224,7 @@ export const userRepository = {
       const userValues = [
         data.firstName,
         data.lastName,
-        dummyHashedPassword,
+        hashedPassword,
         matricule,
         data.contactNumber,
         data.email || null,
@@ -222,9 +244,6 @@ export const userRepository = {
         newUser.id,
         data.homeroomClass || null,
       ]);
-
-      // Note: Si tu gères une table de liaison pour les sujets (subjectIds),
-      // c'est ici qu'on insérerait les relations dans la table teacher_subjects !
 
       await client.query("COMMIT");
       return newUser;
