@@ -10,12 +10,15 @@ import {
 export const userRepository = {
   getAllUsers: async (): Promise<User[]> => {
     const query = `
-      SELECT id, first_name AS "firstName", last_name AS "lastName", email, 
-             contact_number AS "contactNumber", profile_picture_url AS "profilePictureUrl", 
-             user_type AS "role", matricule, gender, created_at AS "createdAt"
-      FROM users
-      ORDER BY created_at DESC;
-    `;
+    SELECT u.id, u.first_name AS "firstName", u.last_name AS "lastName", u.email, 
+           u.contact_number AS "contactNumber", u.profile_picture_url AS "profilePictureUrl", 
+           u.user_type AS "role", u.matricule, u.gender, u.created_at AS "createdAt",
+           s.class_roll_number AS "classRollNumber", s.class_group AS "classGroup", 
+           s.entry_year AS "entryYear", s.graduation_year AS "graduationYear", s.is_active AS "isActive"
+    FROM users u
+    LEFT JOIN students s ON u.id = s.user_id
+    ORDER BY u.created_at DESC;
+  `;
     const { rows } = await pool.query<User>(query);
     return rows;
   },
@@ -243,7 +246,6 @@ export const userRepository = {
       client.release();
     }
   },
-
   findUserWithDetailsById: async (id: string): Promise<any | null> => {
     const query = `
       SELECT u.id, u.first_name AS "firstName", u.last_name AS "lastName", u.email, 
@@ -252,14 +254,9 @@ export const userRepository = {
              s.class_roll_number AS "classRollNumber", s.class_group AS "classGroup", 
              s.date_of_birth AS "dateOfBirth", s.address, 
              s.parents_email AS "parentsEmail", s.parents_contact_number AS "parentsContactNumber",
-             s.entry_year AS "entryYear", s.graduation_year AS "graduationYear", s.is_active AS "isActive",
-             sec.department,
-             t.homeroom_class AS "homeroomClass"
+             s.entry_year AS "entryYear", s.graduation_year AS "graduationYear", s.is_active AS "isActive"
       FROM users u
-      LEFT JOIN administrators a ON u.id = a.user_id
       LEFT JOIN students s ON u.id = s.user_id
-      LEFT JOIN secretaries sec ON u.id = sec.user_id
-      LEFT JOIN teachers t ON u.id = t.user_id
       WHERE u.id = $1
       LIMIT 1;
     `;

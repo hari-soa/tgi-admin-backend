@@ -42,8 +42,9 @@ CREATE TABLE teachers (
     homeroom_class class_group_enum
 );
 
-CREATE TABLE secretaries (
-    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE
+CREATE TABLE IF NOT EXISTS secretaries (
+    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    department VARCHAR(255)
 );
 
 CREATE TABLE students (
