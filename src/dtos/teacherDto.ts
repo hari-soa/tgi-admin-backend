@@ -25,8 +25,8 @@ export const updateTeacherSchema = z.object({
     matricule: z.string().min(2).trim().optional(),
     contactNumber: z.string().optional(),
     email: z.string().email().trim().toLowerCase().optional(),
-    profilePictureUrl: z.string().url().optional(),
-    subjectIds: z.array(z.string()).optional(),
+    profilePictureUrl: z.string().optional(),
+    gender: z.enum(["MALE", "FEMALE"]).optional(),
     homeroomClass: z.enum(classGroupEnum).optional(),
   }),
 });

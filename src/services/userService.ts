@@ -160,6 +160,7 @@ export const userService = {
       password: updateData.password,
       contactNumber: updateData.contactNumber,
       profilePictureUrl: updateData.profilePictureUrl,
+      gender: updateData.gender,
     });
 
     if (targetUser.role === "STUDENT") {
@@ -168,6 +169,8 @@ export const userService = {
       await userRepository.updateSecretaryDetails(targetUserId, updateData);
     } else if (targetUser.role === "TEACHER") {
       await userRepository.updateTeacherDetails(targetUserId, updateData);
+    } else if (targetUser.role === "ADMIN") {
+      await userRepository.updateAdministratorDetails(targetUserId, updateData);
     }
 
     return userService.getUserProfile(targetUserId, {

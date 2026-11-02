@@ -26,7 +26,8 @@ export const updateSecretarySchema = z.object({
     password: z.string().min(8).optional(),
     contactNumber: z.string().optional(),
     email: z.string().email().trim().toLowerCase().optional(),
-    profilePictureUrl: z.string().url().optional(),
+    profilePictureUrl: z.string().optional(),
+    gender: z.enum(["MALE", "FEMALE"]).optional(),
     department: z.string().optional(),
   }),
 });

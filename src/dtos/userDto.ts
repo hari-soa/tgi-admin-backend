@@ -68,11 +68,10 @@ export const createTeacherSchema = z.object({
     firstName: z.string({ message: "First name is required" }).min(2).trim(),
     lastName: z.string({ message: "Last name is required" }).min(2).trim(),
     matricule: z.string({ message: "Matricule is required" }).min(2).trim(),
-    gender: z.enum(genderEnum, { message: "Invalid gender option" }),
     contactNumber: z.string().optional(),
     email: z.string().email().optional(),
-    profilePictureUrl: z.string().url().optional(),
-    subjectIds: z.array(z.string()).optional(),
+    profilePictureUrl: z.string().optional(),
+    gender: z.enum(["MALE", "FEMALE"]).optional(),
     homeroomClass: z.enum(classGroupEnum).optional(),
   }),
 });
