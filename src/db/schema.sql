@@ -43,7 +43,7 @@ CREATE TABLE teachers (
 );
 
 CREATE TABLE secretaries (
-    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE TABLE students (
