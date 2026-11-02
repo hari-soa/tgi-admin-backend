@@ -183,4 +183,12 @@ export const userService = {
     }
     await userRepository.deactivateStudent(targetUserId);
   },
+
+  deleteUser: async (targetUserId: string): Promise<void> => {
+    const targetUser = await userRepository.findById(targetUserId);
+    if (!targetUser) {
+      throw new AppError("User not found", 404);
+    }
+    await userRepository.deleteUser(targetUserId);
+  },
 };

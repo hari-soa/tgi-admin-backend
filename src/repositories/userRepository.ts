@@ -23,6 +23,10 @@ export const userRepository = {
     return rows;
   },
 
+  deleteUser: async (id: string): Promise<void> => {
+    await pool.query(`DELETE FROM users WHERE id = $1;`, [id]);
+  },
+
   findByEmail: async (email: string): Promise<User | null> => {
     const query = `
       SELECT id, first_name AS "firstName", last_name AS "lastName", email, password, matricule, user_type AS "role", contact_number AS "contactNumber", profile_picture_url AS "profilePictureUrl", gender
