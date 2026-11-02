@@ -129,8 +129,8 @@ export const userRepository = {
       const newUser = userRows[0];
 
       const studentDetailsQuery = `
-        INSERT INTO students (user_id, class_roll_number, class_group, date_of_birth, gender, address, parents_email, parents_contact_number, comments, entry_year, graduation_year, is_active)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, TRUE);
+        INSERT INTO students (user_id, class_roll_number, class_group, date_of_birth, gender, address, parents_email, parents_contact_number, entry_year, graduation_year, is_active)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, TRUE);
       `;
       const studentValues = [
         newUser.id,
@@ -141,7 +141,6 @@ export const userRepository = {
         data.address || "Non spécifiée",
         data.parentsEmail || "non.specifie@gmail.com",
         data.parentsContactNumber || "Non spécifié",
-        data.comments || null,
         data.entryYear || new Date().getFullYear(),
         data.graduationYear || null,
       ];
@@ -252,7 +251,7 @@ export const userRepository = {
              u.user_type AS "role", u.matricule, u.gender,
              s.class_roll_number AS "classRollNumber", s.class_group AS "classGroup", 
              s.date_of_birth AS "dateOfBirth", s.address, 
-             s.parents_email AS "parentsEmail", s.parents_contact_number AS "parentsContactNumber", s.comments,
+             s.parents_email AS "parentsEmail", s.parents_contact_number AS "parentsContactNumber",
              s.entry_year AS "entryYear", s.graduation_year AS "graduationYear", s.is_active AS "isActive",
              sec.department,
              t.homeroom_class AS "homeroomClass"
@@ -301,7 +300,6 @@ export const userRepository = {
       address: "address",
       parentsEmail: "parents_email",
       parentsContactNumber: "parents_contact_number",
-      comments: "comments",
       graduationYear: "graduation_year",
     };
 
