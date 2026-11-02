@@ -14,7 +14,6 @@ const router = Router();
 router.use(authenticate);
 
 router.get("/", authorize("ADMIN", "SECRETARY"), userController.getAllUsers);
-
 router.get("/me", userController.getMyProfile);
 
 router.post(
