@@ -1,42 +1,50 @@
 import { z } from "zod";
 
-export * from "./studentDto";
-export * from "./teacherDto";
-export * from "./secretaryDto";
-export * from "./administratorDto";
-
 export type UserRole = "ADMIN" | "TEACHER" | "SECRETARY" | "STUDENT";
 export type ClassGroup = "SECONDE" | "PREMIERE" | "TERMINALE" | "ANCIEN";
 export type Gender = "MALE" | "FEMALE";
-export const classGroupEnum = ["SECONDE", "PREMIERE", "TERMINALE"] as const;
+export const classGroupEnum = [
+  "SECONDE",
+  "PREMIERE",
+  "TERMINALE",
+  "ANCIEN",
+] as const;
+export const genderEnum = ["MALE", "FEMALE"] as const;
 
 export const createAdministratorSchema = z.object({
   body: z.object({
-    firstName: z.string().min(2, "First name is required"),
-    lastName: z.string().min(2, "Last name is required"),
-    password: z.string().min(8, "Password must be at least 8 characters"),
-    contactNumber: z.string().min(5, "Contact number is required"),
-    email: z.string().email("Invalid email format").optional(),
+    firstName: z.string({ message: "First name is required" }).min(2).trim(),
+    lastName: z.string({ message: "Last name is required" }).min(2).trim(),
+    matricule: z.string({ message: "Matricule is required" }).min(2).trim(),
+    gender: z.enum(genderEnum, { message: "Invalid gender option" }),
+    contactNumber: z.string().optional(),
+    email: z.string().email().optional(),
     profilePictureUrl: z.string().url().optional(),
+    role: z.string().optional(),
   }),
 });
 
 export const createStudentSchema = z.object({
   body: z.object({
-    firstName: z.string().min(2),
-    lastName: z.string().min(2),
-    password: z.string().min(8),
-    contactNumber: z.string(),
+    firstName: z.string({ message: "First name is required" }).min(2).trim(),
+    lastName: z.string({ message: "Last name is required" }).min(2).trim(),
+    matricule: z.string({ message: "Matricule is required" }).min(2).trim(),
+    gender: z.enum(genderEnum, { message: "Invalid gender option" }),
+    classRollNumber: z
+      .number({ message: "Class roll number is required" })
+      .int()
+      .positive(),
+    classGroup: z.enum(classGroupEnum, {
+      message: "Invalid class group option",
+    }),
+    contactNumber: z.string().optional(),
     email: z.string().email().optional(),
     profilePictureUrl: z.string().url().optional(),
-    classRollNumber: z.number().min(1),
-    classGroup: z.enum(classGroupEnum),
-    dateOfBirth: z.string(),
-    gender: z.enum(["MALE", "FEMALE"]),
-    address: z.string(),
-    parentsEmail: z.string().email(),
-    parentsContactNumber: z.string(),
-    entryYear: z.number().int().min(2000),
+    dateOfBirth: z.string().optional(),
+    address: z.string().optional(),
+    parentsEmail: z.string().email().optional(),
+    parentsContactNumber: z.string().optional(),
+    entryYear: z.number().int().optional(),
     graduationYear: z.number().int().optional(),
     comments: z.string().optional(),
   }),
@@ -44,10 +52,11 @@ export const createStudentSchema = z.object({
 
 export const createSecretarySchema = z.object({
   body: z.object({
-    firstName: z.string().min(2),
-    lastName: z.string().min(2),
-    password: z.string().min(8),
-    contactNumber: z.string(),
+    firstName: z.string({ message: "First name is required" }).min(2).trim(),
+    lastName: z.string({ message: "Last name is required" }).min(2).trim(),
+    matricule: z.string({ message: "Matricule is required" }).min(2).trim(),
+    gender: z.enum(genderEnum, { message: "Invalid gender option" }),
+    contactNumber: z.string().optional(),
     email: z.string().email().optional(),
     profilePictureUrl: z.string().url().optional(),
     department: z.string().optional(),
@@ -58,17 +67,12 @@ export const createTeacherSchema = z.object({
   body: z.object({
     firstName: z.string({ message: "First name is required" }).min(2).trim(),
     lastName: z.string({ message: "Last name is required" }).min(2).trim(),
-    contactNumber: z.string({ message: "Contact number is required" }),
-    email: z
-      .string()
-      .email("Invalid email address format")
-      .trim()
-      .toLowerCase()
-      .optional(),
+    matricule: z.string({ message: "Matricule is required" }).min(2).trim(),
+    gender: z.enum(genderEnum, { message: "Invalid gender option" }),
+    contactNumber: z.string().optional(),
+    email: z.string().email().optional(),
     profilePictureUrl: z.string().url().optional(),
-    subjectIds: z
-      .array(z.string())
-      .min(1, "Teacher must be assigned to at least one subject"),
+    subjectIds: z.array(z.string()).optional(),
     homeroomClass: z.enum(classGroupEnum).optional(),
   }),
 });
