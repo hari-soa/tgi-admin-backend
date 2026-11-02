@@ -38,6 +38,10 @@ const generateAdminMatricule = async (
 };
 
 export const userService = {
+  getAllUsers: async (): Promise<User[]> => {
+    return userRepository.getAllUsers();
+  },
+
   createAdministrator: async (dto: CreateAdministratorDto): Promise<User> => {
     if (dto.email) {
       const existingUser = await userRepository.findByEmail(dto.email);

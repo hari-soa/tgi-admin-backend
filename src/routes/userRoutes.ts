@@ -35,6 +35,8 @@ router.post(
   userController.createSecretary,
 );
 
+router.get("/", authorize("ADMIN", "SECRETARY"), userController.getAllUsers);
+
 router.get("/:id", authorize("ADMIN", "SECRETARY"), userController.getUserById);
 router.patch("/:id", authorize("ADMIN"), userController.updateUser);
 router.delete("/:id", authorize("ADMIN"), userController.deactivateStudent);

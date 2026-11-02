@@ -4,9 +4,22 @@ import {
   CreateAdministratorDto,
   CreateStudentDto,
   CreateSecretaryDto,
+  CreateTeacherDto,
 } from "../dtos/userDto";
 
 export const userRepository = {
+  getAllUsers: async (): Promise<User[]> => {
+    const query = `
+      SELECT u.id, u.first_name AS "firstName", u.last_name AS "lastName", u.email, 
+             u.contact_number AS "contactNumber", u.profile_picture_url AS "profilePictureUrl", 
+             u.user_type AS "role", u.matricule, u.gender, u.created_at AS "createdAt"
+      FROM users u
+      ORDER BY u.created_at DESC;
+    `;
+    const { rows } = await pool.query<User>(query);
+    return rows;
+  },
+
   findByEmail: async (email: string): Promise<User | null> => {
     const query = `
       SELECT id, first_name AS "firstName", last_name AS "lastName", email, password, matricule, user_type AS "role", contact_number AS "contactNumber", profile_picture_url AS "profilePictureUrl", gender
@@ -161,6 +174,57 @@ export const userRepository = {
         newUser.id,
         data.department || null,
       ]);
+
+      await client.query("COMMIT");
+      return newUser;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  },
+
+  createTeacher: async (
+    data: CreateTeacherDto,
+    matricule: string,
+    dummyHashedPassword: string,
+  ): Promise<User> => {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const userQuery = `
+        INSERT INTO users (first_name, last_name, password, matricule, contact_number, email, profile_picture_url, user_type, gender)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 'TEACHER', 'MALE')
+        RETURNING id, first_name AS "firstName", last_name AS "lastName", email, matricule, user_type AS "role", contact_number AS "contactNumber", profile_picture_url AS "profilePictureUrl";
+      `;
+      const userValues = [
+        data.firstName,
+        data.lastName,
+        dummyHashedPassword,
+        matricule,
+        data.contactNumber,
+        data.email || null,
+        data.profilePictureUrl || null,
+      ];
+      const { rows: userRows } = await client.query<User>(
+        userQuery,
+        userValues,
+      );
+      const newUser = userRows[0];
+
+      const teacherDetailsQuery = `
+        INSERT INTO teachers (user_id, homeroom_class)
+        VALUES ($1, $2);
+      `;
+      await client.query(teacherDetailsQuery, [
+        newUser.id,
+        data.homeroomClass || null,
+      ]);
+
+      // Note: Si tu gères une table de liaison pour les sujets (subjectIds),
+      // c'est ici qu'on insérerait les relations dans la table teacher_subjects !
 
       await client.query("COMMIT");
       return newUser;

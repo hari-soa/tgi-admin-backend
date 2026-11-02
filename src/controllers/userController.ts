@@ -7,6 +7,23 @@ import {
 import { userService } from "../services/userService";
 
 export const userController = {
+  getAllUsers: async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const users = await userService.getAllUsers();
+      res.status(200).json({
+        status: "success",
+        results: users.length,
+        data: { users },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
   createAdministrator: async (
     req: Request<{}, {}, CreateAdministratorDto>,
     res: Response,
