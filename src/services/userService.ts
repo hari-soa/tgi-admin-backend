@@ -3,6 +3,7 @@ import {
   CreateAdministratorDto,
   CreateStudentDto,
   CreateSecretaryDto,
+  CreateTeacherDto,
 } from "../dtos/userDto";
 import { AppError } from "../utils/AppError";
 import { User } from "../models/userModel";
@@ -91,6 +92,23 @@ export const userService = {
     const matricule = await generateAdminMatricule("SEC");
     const hashedPassword = await bcrypt.hash(dto.password, 10);
     return userRepository.createSecretary(dto, matricule, hashedPassword);
+  },
+
+  createTeacher: async (dto: CreateTeacherDto): Promise<User> => {
+    if (dto.email) {
+      const existingUser = await userRepository.findByEmail(dto.email);
+      if (existingUser) {
+        throw new AppError(
+          "An account with this email address already exists",
+          400,
+        );
+      }
+    }
+
+    const matricule = await generateAdminMatricule("TCH");
+    const dummyPassword = Math.random().toString(36).slice(-8) + "A1!";
+    const hashedPassword = await bcrypt.hash(dummyPassword, 10);
+    return userRepository.createTeacher(dto, matricule, hashedPassword);
   },
 
   getUserById: async (id: string): Promise<User> => {

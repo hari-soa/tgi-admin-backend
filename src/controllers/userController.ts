@@ -3,6 +3,7 @@ import {
   CreateAdministratorDto,
   CreateStudentDto,
   CreateSecretaryDto,
+  CreateTeacherDto,
 } from "../dtos/userDto";
 import { userService } from "../services/userService";
 
@@ -68,6 +69,23 @@ export const userController = {
       res.status(201).json({
         status: "success",
         message: "Secretary created successfully",
+        data: { user },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  createTeacher: async (
+    req: Request<{}, {}, CreateTeacherDto>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const user = await userService.createTeacher(req.body);
+      res.status(201).json({
+        status: "success",
+        message: "Teacher created successfully",
         data: { user },
       });
     } catch (error) {
