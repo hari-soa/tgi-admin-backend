@@ -156,6 +156,10 @@ CREATE TABLE grades (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+ALTER TABLE grades 
+ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'DRAFT',
+ADD COLUMN IF NOT EXISTS approved_by_admin_id UUID REFERENCES administrators(user_id);
+
 CREATE TABLE annual_results (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     student_id UUID NOT NULL REFERENCES students(user_id) ON DELETE CASCADE,

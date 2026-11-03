@@ -4,9 +4,9 @@ export enum ExamType {
 }
 
 export enum Term {
-  FIRST_TRIMESTER = 1,
-  SECOND_TRIMESTER = 2,
-  THIRD_TRIMESTER = 3,
+  FIRST_TRIMESTER = "FIRST_TRIMESTER",
+  SECOND_TRIMESTER = "SECOND_TRIMESTER",
+  THIRD_TRIMESTER = "THIRD_TRIMESTER",
 }
 
 export interface Grade {
