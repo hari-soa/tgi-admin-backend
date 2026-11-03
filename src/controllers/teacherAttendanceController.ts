@@ -72,6 +72,37 @@ export const teacherAttendanceController = {
     }
   },
 
+  updateSlot: async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const slotId = req.params.slotId as string;
+      const updated = await teacherAttendanceService.updateSlot(
+        slotId,
+        req.body,
+      );
+      res.status(200).json({ status: "success", data: updated });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  deleteSlot: async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const slotId = req.params.slotId as string;
+      await teacherAttendanceService.deleteSlot(slotId);
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  },
+
   getSummaryCards: async (
     req: Request,
     res: Response,

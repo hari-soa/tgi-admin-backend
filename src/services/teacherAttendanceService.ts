@@ -22,6 +22,22 @@ export const teacherAttendanceService = {
     return await teacherAttendanceRepository.createSlot(dto);
   },
 
+  updateSlot: async (slotId: string, dto: any): Promise<any> => {
+    const slot = await teacherAttendanceRepository.findSlotById(slotId);
+    if (!slot) {
+      throw new AppError("Attendance slot not found", 404);
+    }
+    return await teacherAttendanceRepository.updateSlot(slotId, dto);
+  },
+
+  deleteSlot: async (slotId: string): Promise<any> => {
+    const slot = await teacherAttendanceRepository.findSlotById(slotId);
+    if (!slot) {
+      throw new AppError("Attendance slot not found", 404);
+    }
+    return await teacherAttendanceRepository.deleteSlot(slotId);
+  },
+
   getDailyCards: async (
     dayOfWeek: string,
     attendanceDate: string,
