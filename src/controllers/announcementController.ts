@@ -59,6 +59,28 @@ export const announcementController = {
       next(error);
     }
   },
+  update: async (
+    req: Request<{ id: string }, {}, any>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const { targetClasses, ...dto } = req.body;
+      const announcement = await announcementService.updateAnnouncement(
+        req.params.id,
+        dto,
+        targetClasses,
+      );
+
+      res.status(200).json({
+        status: "success",
+        message: "Announcement updated successfully",
+        data: { announcement },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
 
   delete: async (
     req: Request<{ id: string }>,

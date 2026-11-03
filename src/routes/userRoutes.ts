@@ -44,9 +44,6 @@ router.post(
   userController.createTeacher,
 );
 
-router.delete("/:id", userController.deleteUser);
-router.patch("/:id", userController.updateUser);
-
 router.get("/:id", authorize("ADMIN", "SECRETARY"), userController.getUserById);
 router.patch("/:id", authorize("ADMIN"), userController.updateUser);
 router.patch(

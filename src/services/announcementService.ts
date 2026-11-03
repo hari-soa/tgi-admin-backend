@@ -1,5 +1,8 @@
 import { announcementRepository } from "../repositories/announcementRepository";
-import { CreateAnnouncementDto } from "../dtos/announcementDto";
+import {
+  CreateAnnouncementDto,
+  UpdateAnnouncementDto,
+} from "../dtos/announcementDto";
 import { AppError } from "../utils/AppError";
 
 export const announcementService = {
@@ -21,6 +24,18 @@ export const announcementService = {
       throw new AppError("Announcement not found", 404);
     }
     return announcement;
+  },
+
+  updateAnnouncement: async (
+    id: string,
+    dto: UpdateAnnouncementDto,
+    targetClasses?: string[],
+  ) => {
+    const announcement = await announcementRepository.findById(id);
+    if (!announcement) {
+      throw new AppError("Announcement not found", 404);
+    }
+    return announcementRepository.update(id, dto, targetClasses);
   },
 
   deleteAnnouncement: async (id: string) => {

@@ -23,10 +23,6 @@ export const userRepository = {
     return rows;
   },
 
-  deleteUser: async (id: string): Promise<void> => {
-    await pool.query(`DELETE FROM users WHERE id = $1;`, [id]);
-  },
-
   findByEmail: async (email: string): Promise<User | null> => {
     const query = `
       SELECT id, first_name AS "firstName", last_name AS "lastName", email, password, matricule, user_type AS "role", contact_number AS "contactNumber", profile_picture_url AS "profilePictureUrl", gender
@@ -302,9 +298,6 @@ export const userRepository = {
       parentsEmail: "parents_email",
       parentsContactNumber: "parents_contact_number",
       graduationYear: "graduation_year",
-      entryYear: "entry_year",
-      isActive: "is_active",
-      comments: "comments",
     };
 
     for (const [key, dbCol] of Object.entries(mapping)) {
@@ -320,57 +313,21 @@ export const userRepository = {
     }
   },
 
-  updateTeacherDetails: async (userId: string, data: any): Promise<void> => {
-    const fields: string[] = [];
-    const values: any[] = [];
-    let idx = 1;
-
-    if (data.homeroomClass !== undefined) {
-      fields.push(`homeroom_class = $${idx++}`);
-      values.push(data.homeroomClass);
-    }
-
-    if (fields.length > 0) {
-      values.push(userId);
-      const query = `UPDATE teachers SET ${fields.join(", ")} WHERE user_id = $${idx};`;
-      await pool.query(query, values);
-    }
-  },
-
   updateSecretaryDetails: async (userId: string, data: any): Promise<void> => {
-    const fields: string[] = [];
-    const values: any[] = [];
-    let idx = 1;
-
     if (data.department !== undefined) {
-      fields.push(`department = $${idx++}`);
-      values.push(data.department);
-    }
-
-    if (fields.length > 0) {
-      values.push(userId);
-      const query = `UPDATE secretaries SET ${fields.join(", ")} WHERE user_id = $${idx};`;
-      await pool.query(query, values);
+      await pool.query(
+        `UPDATE secretaries SET department = $1 WHERE user_id = $2;`,
+        [data.department, userId],
+      );
     }
   },
 
-  updateAdministratorDetails: async (
-    userId: string,
-    data: any,
-  ): Promise<void> => {
-    const fields: string[] = [];
-    const values: any[] = [];
-    let idx = 1;
-
-    if (data.role !== undefined) {
-      fields.push(`role = $${idx++}`);
-      values.push(data.role);
-    }
-
-    if (fields.length > 0) {
-      values.push(userId);
-      const query = `UPDATE administrators SET ${fields.join(", ")} WHERE user_id = $${idx};`;
-      await pool.query(query, values);
+  updateTeacherDetails: async (userId: string, data: any): Promise<void> => {
+    if (data.homeroomClass !== undefined) {
+      await pool.query(
+        `UPDATE teachers SET homeroom_class = $1 WHERE user_id = $2;`,
+        [data.homeroomClass, userId],
+      );
     }
   },
 

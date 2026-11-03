@@ -21,7 +21,7 @@ export const createAnnouncementSchema = z.object({
     targetScope: z.enum(targetScopeEnum, {
       message: "Invalid target scope",
     }),
-    targetValue: z.string().optional(),
+    targetValue: z.string().optional().nullable(),
     priority: z
       .enum(announcementPriorityEnum, {
         message: "Invalid priority level",
