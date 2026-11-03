@@ -47,7 +47,6 @@ export const resultService = {
     resultId: string,
     requestingUser: { userId: string; role: string },
   ) => {
-    // 1. Récupérer le bulletin
     const result = await resultRepository.findById(resultId);
     if (!result) {
       throw new AppError("Annual result not found", 404);
