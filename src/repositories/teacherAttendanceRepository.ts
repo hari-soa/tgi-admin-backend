@@ -61,10 +61,9 @@ export const teacherAttendanceRepository = {
         tas.subject_id AS "subjectId",
         s.name AS "subjectName",
         tas.target_class AS "targetClass",
-        tas.classroom,
         tas.start_time AS "startTime",
         tas.end_time AS "endTime",
-        COALESCE(ta.status, 'PENDING') AS "status",
+        COALESCE(ta.status::TEXT, 'PENDING') AS "status",
         ta.actual_check_in_time AS "actualCheckInTime",
         COALESCE(ta.late_duration_minutes, 0) AS "lateDurationMinutes",
         ta.motif
