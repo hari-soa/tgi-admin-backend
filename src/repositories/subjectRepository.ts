@@ -1,5 +1,5 @@
 import { pool } from "../config/db";
-import { CreateSubjectDto } from "../dtos/subjectDto";
+import { CreateSubjectDto, UpdateSubjectDto } from "../dtos/subjectDto";
 
 export const subjectRepository = {
   create: async (dto: CreateSubjectDto): Promise<any> => {
@@ -44,13 +44,76 @@ export const subjectRepository = {
         );
 
         await client.query(
-          `INSERT INTO teacher_subject_classes (subject_id, class_group, teacher_id) VALUES ($1, $2, $3)
-           ON CONFLICT (subject_id, class_group) DO UPDATE SET teacher_id = EXCLUDED.teacher_id;`,
+          `INSERT INTO teacher_subjects (subject_id, class_group, teacher_id) VALUES ($1, $2, $3)
+            ON CONFLICT (subject_id, class_group) DO UPDATE SET teacher_id = EXCLUDED.teacher_id;`,
           [subject.id, assignment.classGroup, assignment.teacherId],
         );
       }
       await client.query("COMMIT");
       return subjectRepository.findById(subject.id);
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  },
+
+  update: async (id: string, dto: UpdateSubjectDto): Promise<any> => {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const fields: string[] = [];
+      const values: any[] = [];
+      let idx = 1;
+
+      if (dto.name !== undefined) {
+        fields.push(`name = $${idx++}`);
+        values.push(dto.name);
+      }
+      if (dto.coefficient !== undefined) {
+        fields.push(`coefficient = $${idx++}`);
+        values.push(dto.coefficient);
+      }
+      if (dto.description !== undefined) {
+        fields.push(`description = $${idx++}`);
+        values.push(dto.description);
+      }
+
+      if (fields.length > 0) {
+        fields.push(`updated_at = CURRENT_TIMESTAMP`);
+        values.push(id);
+        const updateQuery = `UPDATE subjects SET ${fields.join(", ")} WHERE id = $${idx}`;
+        await client.query(updateQuery, values);
+      }
+
+      if (dto.assignments) {
+        await client.query(
+          `DELETE FROM teacher_subjects WHERE subject_id = $1`,
+          [id],
+        );
+        await client.query(
+          `DELETE FROM subject_target_classes WHERE subject_id = $1`,
+          [id],
+        );
+
+        for (const assignment of dto.assignments) {
+          await client.query(
+            `INSERT INTO subject_target_classes (subject_id, target_class) VALUES ($1, $2) ON CONFLICT DO NOTHING;`,
+            [id, assignment.classGroup],
+          );
+
+          await client.query(
+            `INSERT INTO teacher_subjects (subject_id, class_group, teacher_id) VALUES ($1, $2, $3)
+             ON CONFLICT (subject_id, class_group) DO UPDATE SET teacher_id = EXCLUDED.teacher_id;`,
+            [id, assignment.classGroup, assignment.teacherId],
+          );
+        }
+      }
+
+      await client.query("COMMIT");
+      return subjectRepository.findById(id);
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;
@@ -74,7 +137,7 @@ export const subjectRepository = {
     const assignmentsQuery = `
       SELECT tsc.class_group AS "classGroup", tsc.teacher_id AS "teacherId", 
              u.first_name AS "teacherFirstName", u.last_name AS "teacherLastName"
-      FROM teacher_subject_classes tsc
+      FROM teacher_subjects tsc
       JOIN users u ON tsc.teacher_id = u.id
       WHERE tsc.subject_id = $1;
     `;
@@ -98,7 +161,7 @@ export const subjectRepository = {
       const assignmentsQuery = `
         SELECT tsc.class_group AS "classGroup", tsc.teacher_id AS "teacherId", 
                u.first_name AS "teacherFirstName", u.last_name AS "teacherLastName"
-        FROM teacher_subject_classes tsc
+        FROM teacher_subjects tsc
         JOIN users u ON tsc.teacher_id = u.id
         WHERE tsc.subject_id = $1;
       `;

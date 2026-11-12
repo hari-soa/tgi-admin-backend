@@ -11,13 +11,8 @@ export const gradeService = {
     return gradeRepository.submitSession(dto, secretaryId);
   },
 
-  reviewGrade: async (id: string, status: string, adminId: string) => {
-    const grade = await gradeRepository.findById(id);
-    if (!grade) {
-      throw new AppError("Grade not found", 404);
-    }
-    const updated = await gradeRepository.updateStatus(id, status, adminId);
-    return updated;
+  getAllGrades: async () => {
+    return gradeRepository.findAll();
   },
 
   getGradeById: async (id: string) => {
@@ -26,5 +21,29 @@ export const gradeService = {
       throw new AppError("Grade not found", 404);
     }
     return grade;
+  },
+
+  updateGrade: async (id: string, dto: Partial<CreateGradeDto>) => {
+    const grade = await gradeRepository.findById(id);
+    if (!grade) {
+      throw new AppError("Grade not found", 404);
+    }
+    return gradeRepository.update(id, dto);
+  },
+
+  reviewGrade: async (id: string, status: string, adminId: string) => {
+    const grade = await gradeRepository.findById(id);
+    if (!grade) {
+      throw new AppError("Grade not found", 404);
+    }
+    return gradeRepository.updateStatus(id, status, adminId);
+  },
+
+  deleteGrade: async (id: string) => {
+    const success = await gradeRepository.delete(id);
+    if (!success) {
+      throw new AppError("Grade not found or already deleted", 404);
+    }
+    return { message: "Grade deleted successfully" };
   },
 };

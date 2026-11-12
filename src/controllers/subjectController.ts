@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { subjectService } from "../services/subjectService";
+import { UpdateSubjectDto } from "../dtos/subjectDto";
 
 export const subjectController = {
   create: async (
@@ -12,6 +13,26 @@ export const subjectController = {
       res.status(201).json({
         status: "success",
         message: "Subject created successfully",
+        data: { subject },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  update: async (
+    req: Request<{ id: string }, {}, UpdateSubjectDto>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const subject = await subjectService.updateSubject(
+        req.params.id,
+        req.body,
+      );
+      res.status(200).json({
+        status: "success",
+        message: "Subject updated successfully",
         data: { subject },
       });
     } catch (error) {

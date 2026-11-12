@@ -28,6 +28,7 @@ app.use("/api/v1/disciplinary", disciplinaryRoutes);
 app.use("/api/v1/subjects", subjectRoutes);
 app.use("/api/v1/teacherAttendance", teacherAttendanceRoutes);
 app.use("/api/v1/grades", gradeRoutes);
+app.use("/api/v1/attendance", teacherAttendanceRoutes);
 
 app.all(/(.*)/, (req, _res, next) => {
   next(new AppError(`Cannot find ${req.originalUrl} on this server!`, 404));

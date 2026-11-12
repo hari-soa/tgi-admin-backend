@@ -5,8 +5,9 @@ export enum ResultStatus {
 }
 
 export enum AcademicDecision {
-  PASS = "PASS",
-  FAIL = "FAIL",
+  PROMOTE = "PROMOTE",
+  REPEAT = "REPEAT",
+  ORIENTED = "ORIENTED",
   PENDING = "PENDING",
 }
 

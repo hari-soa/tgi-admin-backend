@@ -9,6 +9,8 @@ const dayOfWeekEnum = z.enum([
   "SATURDAY",
 ]);
 
+const attendanceStatusEnum = z.enum(["PRESENT", "LATE", "ABSENT"]);
+
 const timeFormatRegex = /^([01]\d|2[0-3]):([0-5]\d)(:[0-5]\d)?$/;
 
 export const createAttendanceSlotSchema = z.object({
@@ -28,6 +30,12 @@ export const checkAttendanceSchema = z.object({
   attendanceDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
 
+export const updateAttendanceSchema = z.object({
+  status: attendanceStatusEnum.optional(),
+  lateDurationMinutes: z.number().int().min(0).optional(),
+  motif: z.string().optional(),
+});
+
 export const updateAttendanceMotifSchema = z.object({
   motif: z.string().min(1),
 });
@@ -39,6 +47,7 @@ export type UpdateAttendanceSlotDto = z.infer<
   typeof updateAttendanceSlotSchema
 >;
 export type CheckAttendanceDto = z.infer<typeof checkAttendanceSchema>;
+export type UpdateAttendanceDto = z.infer<typeof updateAttendanceSchema>;
 export type UpdateAttendanceMotifDto = z.infer<
   typeof updateAttendanceMotifSchema
 >;

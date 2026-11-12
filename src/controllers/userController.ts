@@ -3,10 +3,28 @@ import {
   CreateAdministratorDto,
   CreateStudentDto,
   CreateSecretaryDto,
+  CreateTeacherDto,
 } from "../dtos/userDto";
 import { userService } from "../services/userService";
 
 export const userController = {
+  getAllUsers: async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const users = await userService.getAllUsers();
+      res.status(200).json({
+        status: "success",
+        results: users.length,
+        data: { users },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
   createAdministrator: async (
     req: Request<{}, {}, CreateAdministratorDto>,
     res: Response,
@@ -51,6 +69,23 @@ export const userController = {
       res.status(201).json({
         status: "success",
         message: "Secretary created successfully",
+        data: { user },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  createTeacher: async (
+    req: Request<{}, {}, CreateTeacherDto>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const user = await userService.createTeacher(req.body);
+      res.status(201).json({
+        status: "success",
+        message: "Teacher created successfully",
         data: { user },
       });
     } catch (error) {

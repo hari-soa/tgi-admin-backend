@@ -2,7 +2,10 @@ import { Router } from "express";
 import { announcementController } from "../controllers/announcementController";
 import { authenticate, authorize } from "../middlewares/authMiddleware";
 import { validate } from "../middlewares/validateMiddlewares";
-import { createAnnouncementSchema } from "../dtos/announcementDto";
+import {
+  createAnnouncementSchema,
+  updateAnnouncementSchema,
+} from "../dtos/announcementDto";
 
 const router = Router();
 
@@ -16,6 +19,13 @@ router.post(
   authorize("ADMIN"),
   validate(createAnnouncementSchema),
   announcementController.create,
+);
+
+router.patch(
+  "/:id",
+  authorize("ADMIN"),
+  validate(updateAnnouncementSchema),
+  announcementController.update,
 );
 
 router.delete("/:id", authorize("ADMIN"), announcementController.delete);

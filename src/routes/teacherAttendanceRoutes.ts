@@ -6,6 +6,7 @@ import {
   createAttendanceSlotSchema,
   checkAttendanceSchema,
   updateAttendanceMotifSchema,
+  updateAttendanceSlotSchema,
 } from "../dtos/teacherAttendanceDto";
 
 export const router = Router();
@@ -46,6 +47,21 @@ router.get(
   authenticate,
   authorize("ADMIN"),
   teacherAttendanceController.getSummaryCards,
+);
+
+router.patch(
+  "/slots/:slotId",
+  authenticate,
+  authorize("ADMIN"),
+  validate(updateAttendanceSlotSchema),
+  teacherAttendanceController.updateSlot,
+);
+
+router.delete(
+  "/slots/:slotId",
+  authenticate,
+  authorize("ADMIN"),
+  teacherAttendanceController.deleteSlot,
 );
 
 export default router;

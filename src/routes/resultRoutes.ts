@@ -11,8 +11,6 @@ const router = Router();
 
 router.use(authenticate);
 
-router.get("/:id", resultController.getById);
-
 router.get("/student/:studentId", resultController.getByStudent);
 
 router.post(
@@ -22,8 +20,15 @@ router.post(
   resultController.create,
 );
 
-router.patch("/:id/review", authorize("ADMIN"), resultController.review);
+router.patch(
+  "/:id/review",
+  authorize("ADMIN"),
+  validate(updateAnnualResultSchema),
+  resultController.review,
+);
 
 router.get("/:id/pdf", resultController.exportPdf);
+
+router.get("/:id", resultController.getById);
 
 export default router;

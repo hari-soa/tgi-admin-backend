@@ -42,8 +42,9 @@ CREATE TABLE teachers (
     homeroom_class class_group_enum
 );
 
-CREATE TABLE secretaries (
+CREATE TABLE IF NOT EXISTS secretaries (
     user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    department VARCHAR(255)
 );
 
 CREATE TABLE students (
@@ -154,6 +155,10 @@ CREATE TABLE grades (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE grades 
+ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'DRAFT',
+ADD COLUMN IF NOT EXISTS approved_by_admin_id UUID REFERENCES administrators(user_id);
 
 CREATE TABLE annual_results (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

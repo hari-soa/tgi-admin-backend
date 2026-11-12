@@ -1,13 +1,13 @@
 import { subjectRepository } from "../repositories/subjectRepository";
 import { userRepository } from "../repositories/userRepository";
-import { CreateSubjectDto } from "../dtos/subjectDto";
+import { CreateSubjectDto, UpdateSubjectDto } from "../dtos/subjectDto";
 import { AppError } from "../utils/AppError";
 
 export const subjectService = {
   createSubject: async (dto: CreateSubjectDto) => {
     for (const assignment of dto.assignments) {
       const teacher = await userRepository.findById(assignment.teacherId);
-      if (!teacher || teacher.role !== "TEACHER") {
+      if (!teacher || (teacher.role || "").toUpperCase() !== "TEACHER") {
         throw new AppError(
           `Teacher with ID ${assignment.teacherId} not found or is not a teacher`,
           400,
@@ -25,6 +25,27 @@ export const subjectService = {
       }
       throw error;
     }
+  },
+
+  updateSubject: async (id: string, dto: UpdateSubjectDto) => {
+    const subject = await subjectRepository.findById(id);
+    if (!subject) {
+      throw new AppError("Subject not found", 404);
+    }
+
+    if (dto.assignments) {
+      for (const assignment of dto.assignments) {
+        const teacher = await userRepository.findById(assignment.teacherId);
+        if (!teacher || (teacher.role || "").toUpperCase() !== "TEACHER") {
+          throw new AppError(
+            `Teacher with ID ${assignment.teacherId} not found or is not a teacher`,
+            400,
+          );
+        }
+      }
+    }
+
+    return subjectRepository.update(id, dto);
   },
 
   getAllSubjects: async () => {

@@ -2,4 +2,5 @@ export enum ClassGroup {
   SECONDE = "SECONDE",
   PREMIERE = "PREMIERE",
   TERMINALE = "TERMINALE",
+  ANCIEN = "ANCIEN",
 }

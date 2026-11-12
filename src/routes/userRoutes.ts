@@ -6,12 +6,14 @@ import {
   createAdministratorSchema,
   createStudentSchema,
   createSecretarySchema,
+  createTeacherSchema,
 } from "../dtos/userDto";
 
 const router = Router();
 
 router.use(authenticate);
 
+router.get("/", authorize("ADMIN", "SECRETARY"), userController.getAllUsers);
 router.get("/me", userController.getMyProfile);
 
 router.post(
@@ -35,8 +37,19 @@ router.post(
   userController.createSecretary,
 );
 
+router.post(
+  "/teachers",
+  authorize("ADMIN"),
+  validate(createTeacherSchema),
+  userController.createTeacher,
+);
+
 router.get("/:id", authorize("ADMIN", "SECRETARY"), userController.getUserById);
 router.patch("/:id", authorize("ADMIN"), userController.updateUser);
-router.delete("/:id", authorize("ADMIN"), userController.deactivateStudent);
+router.patch(
+  "/students/:id/deactivate",
+  authorize("ADMIN"),
+  userController.deactivateStudent,
+);
 
 export default router;

@@ -4,9 +4,25 @@ import {
   CreateAdministratorDto,
   CreateStudentDto,
   CreateSecretaryDto,
+  CreateTeacherDto,
 } from "../dtos/userDto";
 
 export const userRepository = {
+  getAllUsers: async (): Promise<User[]> => {
+    const query = `
+    SELECT u.id, u.first_name AS "firstName", u.last_name AS "lastName", u.email, 
+           u.contact_number AS "contactNumber", u.profile_picture_url AS "profilePictureUrl", 
+           u.user_type AS "role", u.matricule, u.gender, u.created_at AS "createdAt",
+           s.class_roll_number AS "classRollNumber", s.class_group AS "classGroup", 
+           s.entry_year AS "entryYear", s.graduation_year AS "graduationYear", s.is_active AS "isActive"
+    FROM users u
+    LEFT JOIN students s ON u.id = s.user_id
+    ORDER BY u.created_at DESC;
+  `;
+    const { rows } = await pool.query<User>(query);
+    return rows;
+  },
+
   findByEmail: async (email: string): Promise<User | null> => {
     const query = `
       SELECT id, first_name AS "firstName", last_name AS "lastName", email, password, matricule, user_type AS "role", contact_number AS "contactNumber", profile_picture_url AS "profilePictureUrl", gender
@@ -47,22 +63,43 @@ export const userRepository = {
     matricule: string,
     hashedPassword: string,
   ): Promise<User> => {
-    const query = `
-      INSERT INTO users (first_name, last_name, password, matricule, contact_number, email, profile_picture_url, user_type, gender)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 'ADMIN', 'MALE')
-      RETURNING id, first_name AS "firstName", last_name AS "lastName", email, matricule, user_type AS "role", contact_number AS "contactNumber", profile_picture_url AS "profilePictureUrl";
-    `;
-    const values = [
-      data.firstName,
-      data.lastName,
-      hashedPassword,
-      matricule,
-      data.contactNumber,
-      data.email || null,
-      data.profilePictureUrl || null,
-    ];
-    const { rows } = await pool.query<User>(query, values);
-    return rows[0];
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const userQuery = `
+        INSERT INTO users (first_name, last_name, password, matricule, contact_number, email, profile_picture_url, user_type, gender)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 'ADMIN', $8)
+        RETURNING id, first_name AS "firstName", last_name AS "lastName", email, matricule, user_type AS "role", contact_number AS "contactNumber", profile_picture_url AS "profilePictureUrl";
+      `;
+      const userValues = [
+        data.firstName,
+        data.lastName,
+        hashedPassword,
+        matricule,
+        data.contactNumber || "Non spécifié",
+        data.email || null,
+        data.profilePictureUrl || null,
+        data.gender,
+      ];
+      const { rows: userRows } = await client.query<User>(
+        userQuery,
+        userValues,
+      );
+      const newUser = userRows[0];
+
+      await client.query(
+        `INSERT INTO administrators (user_id, role) VALUES ($1, 'ADMIN');`,
+        [newUser.id],
+      );
+
+      await client.query("COMMIT");
+      return newUser;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   },
 
   createStudent: async (
@@ -73,7 +110,6 @@ export const userRepository = {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-
       const userQuery = `
         INSERT INTO users (first_name, last_name, password, matricule, contact_number, email, profile_picture_url, user_type, gender)
         VALUES ($1, $2, $3, $4, $5, $6, $7, 'STUDENT', $8)
@@ -84,7 +120,7 @@ export const userRepository = {
         data.lastName,
         hashedPassword,
         matricule,
-        data.contactNumber,
+        data.contactNumber || "Non spécifié",
         data.email || null,
         data.profilePictureUrl || null,
         data.gender,
@@ -96,20 +132,19 @@ export const userRepository = {
       const newUser = userRows[0];
 
       const studentDetailsQuery = `
-        INSERT INTO students (user_id, class_roll_number, class_group, date_of_birth, gender, address, parents_email, parents_contact_number, comments, entry_year, graduation_year, is_active)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, TRUE);
+        INSERT INTO students (user_id, class_roll_number, class_group, date_of_birth, gender, address, parents_email, parents_contact_number, entry_year, graduation_year, is_active)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, TRUE);
       `;
       const studentValues = [
         newUser.id,
         data.classRollNumber,
         data.classGroup,
-        data.dateOfBirth,
+        data.dateOfBirth || new Date().toISOString().split("T")[0],
         data.gender,
-        data.address,
-        data.parentsEmail,
-        data.parentsContactNumber,
-        data.comments || null,
-        data.entryYear,
+        data.address || "Non spécifiée",
+        data.parentsEmail || "non.specifie@gmail.com",
+        data.parentsContactNumber || "Non spécifié",
+        data.entryYear || new Date().getFullYear(),
         data.graduationYear || null,
       ];
       await client.query(studentDetailsQuery, studentValues);
@@ -132,10 +167,9 @@ export const userRepository = {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-
       const userQuery = `
         INSERT INTO users (first_name, last_name, password, matricule, contact_number, email, profile_picture_url, user_type, gender)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, 'SECRETARY', 'FEMALE')
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 'SECRETARY', $8)
         RETURNING id, first_name AS "firstName", last_name AS "lastName", email, matricule, user_type AS "role", contact_number AS "contactNumber", profile_picture_url AS "profilePictureUrl";
       `;
       const userValues = [
@@ -143,9 +177,10 @@ export const userRepository = {
         data.lastName,
         hashedPassword,
         matricule,
-        data.contactNumber,
+        data.contactNumber || "Non spécifié",
         data.email || null,
         data.profilePictureUrl || null,
+        data.gender,
       ];
       const { rows: userRows } = await client.query<User>(
         userQuery,
@@ -153,14 +188,10 @@ export const userRepository = {
       );
       const newUser = userRows[0];
 
-      const secretaryDetailsQuery = `
-        INSERT INTO secretaries (user_id, department)
-        VALUES ($1, $2);
-      `;
-      await client.query(secretaryDetailsQuery, [
-        newUser.id,
-        data.department || null,
-      ]);
+      await client.query(
+        `INSERT INTO secretaries (user_id, department) VALUES ($1, $2);`,
+        [newUser.id, data.department || null],
+      );
 
       await client.query("COMMIT");
       return newUser;
@@ -172,6 +203,49 @@ export const userRepository = {
     }
   },
 
+  createTeacher: async (
+    data: CreateTeacherDto,
+    matricule: string,
+    hashedPassword: string,
+  ): Promise<User> => {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const userQuery = `
+        INSERT INTO users (first_name, last_name, password, matricule, contact_number, email, profile_picture_url, user_type, gender)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 'TEACHER', $8)
+        RETURNING id, first_name AS "firstName", last_name AS "lastName", email, matricule, user_type AS "role", contact_number AS "contactNumber", profile_picture_url AS "profilePictureUrl";
+      `;
+      const userValues = [
+        data.firstName,
+        data.lastName,
+        hashedPassword,
+        matricule,
+        data.contactNumber || "Non spécifié",
+        data.email || null,
+        data.profilePictureUrl || null,
+        data.gender,
+      ];
+      const { rows: userRows } = await client.query<User>(
+        userQuery,
+        userValues,
+      );
+      const newUser = userRows[0];
+
+      await client.query(
+        `INSERT INTO teachers (user_id, homeroom_class) VALUES ($1, $2);`,
+        [newUser.id, data.homeroomClass || null],
+      );
+
+      await client.query("COMMIT");
+      return newUser;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  },
   findUserWithDetailsById: async (id: string): Promise<any | null> => {
     const query = `
       SELECT u.id, u.first_name AS "firstName", u.last_name AS "lastName", u.email, 
@@ -179,15 +253,10 @@ export const userRepository = {
              u.user_type AS "role", u.matricule, u.gender,
              s.class_roll_number AS "classRollNumber", s.class_group AS "classGroup", 
              s.date_of_birth AS "dateOfBirth", s.address, 
-             s.parents_email AS "parentsEmail", s.parents_contact_number AS "parentsContactNumber", s.comments,
-             s.entry_year AS "entryYear", s.graduation_year AS "graduationYear", s.is_active AS "isActive",
-             sec.department,
-             t.homeroom_class AS "homeroomClass"
+             s.parents_email AS "parentsEmail", s.parents_contact_number AS "parentsContactNumber",
+             s.entry_year AS "entryYear", s.graduation_year AS "graduationYear", s.is_active AS "isActive"
       FROM users u
-      LEFT JOIN administrators a ON u.id = a.user_id
       LEFT JOIN students s ON u.id = s.user_id
-      LEFT JOIN secretaries sec ON u.id = sec.user_id
-      LEFT JOIN teachers t ON u.id = t.user_id
       WHERE u.id = $1
       LIMIT 1;
     `;
@@ -210,9 +279,7 @@ export const userRepository = {
         values.push(value);
       }
     }
-
     if (fields.length === 0) return;
-
     values.push(id);
     const query = `UPDATE users SET ${fields.join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE id = $${idx};`;
     await pool.query(query, values);
@@ -222,7 +289,6 @@ export const userRepository = {
     const fields: string[] = [];
     const values: any[] = [];
     let idx = 1;
-
     const mapping: Record<string, string> = {
       classRollNumber: "class_roll_number",
       classGroup: "class_group",
@@ -231,7 +297,6 @@ export const userRepository = {
       address: "address",
       parentsEmail: "parents_email",
       parentsContactNumber: "parents_contact_number",
-      comments: "comments",
       graduationYear: "graduation_year",
     };
 
@@ -241,7 +306,6 @@ export const userRepository = {
         values.push(data[key]);
       }
     }
-
     if (fields.length > 0) {
       values.push(userId);
       const query = `UPDATE students SET ${fields.join(", ")} WHERE user_id = $${idx};`;

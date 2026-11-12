@@ -63,6 +63,19 @@ export const gradeRepository = {
     }
   },
 
+  findAll: async (): Promise<any[]> => {
+    const query = `
+      SELECT id, student_id AS "studentId", subject_id AS "subjectId", class_group AS "classGroup",
+             created_by_secretary_id AS "createdBySecretaryId", approved_by_admin_id AS "approvedByAdminId",
+             exam_type AS "examType", term, value, max_score AS "maxScore", status,
+             evaluation_date AS "evaluationDate", created_at AS "createdAt", updated_at AS "updatedAt"
+      FROM grades
+      ORDER BY created_at DESC;
+    `;
+    const { rows } = await pool.query(query);
+    return rows;
+  },
+
   findById: async (id: string): Promise<any | null> => {
     const query = `
       SELECT id, student_id AS "studentId", subject_id AS "subjectId", class_group AS "classGroup",
@@ -77,6 +90,28 @@ export const gradeRepository = {
     return rows[0] || null;
   },
 
+  update: async (
+    id: string,
+    dto: Partial<CreateGradeDto>,
+  ): Promise<any | null> => {
+    const query = `
+      UPDATE grades
+      SET value = COALESCE($1, value),
+          max_score = COALESCE($2, max_score),
+          evaluation_date = COALESCE($3, evaluation_date),
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $4
+      RETURNING id, student_id AS "studentId", subject_id AS "subjectId", value, max_score AS "maxScore", updated_at AS "updatedAt";
+    `;
+    const { rows } = await pool.query(query, [
+      dto.value,
+      dto.maxScore,
+      dto.evaluationDate,
+      id,
+    ]);
+    return rows[0] || null;
+  },
+
   updateStatus: async (
     id: string,
     status: string,
@@ -85,10 +120,16 @@ export const gradeRepository = {
     const query = `
       UPDATE grades
       SET status = $1, approved_by_admin_id = $2, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $4
+      WHERE id = $3
       RETURNING id, status, approved_by_admin_id AS "approvedByAdminId", updated_at AS "updatedAt";
     `;
     const { rows } = await pool.query(query, [status, adminId, id]);
     return rows[0] || null;
+  },
+
+  delete: async (id: string): Promise<boolean> => {
+    const query = `DELETE FROM grades WHERE id = $1 RETURNING id;`;
+    const { rows } = await pool.query(query, [id]);
+    return rows.length > 0;
   },
 };

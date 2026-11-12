@@ -61,10 +61,9 @@ export const teacherAttendanceRepository = {
         tas.subject_id AS "subjectId",
         s.name AS "subjectName",
         tas.target_class AS "targetClass",
-        tas.classroom,
         tas.start_time AS "startTime",
         tas.end_time AS "endTime",
-        COALESCE(ta.status, 'PENDING') AS "status",
+        COALESCE(ta.status::TEXT, 'PENDING') AS "status",
         ta.actual_check_in_time AS "actualCheckInTime",
         COALESCE(ta.late_duration_minutes, 0) AS "lateDurationMinutes",
         ta.motif
@@ -188,6 +187,40 @@ export const teacherAttendanceRepository = {
       `SELECT * FROM teacher_attendance_slots WHERE id = $1`,
       [slotId],
     );
+    return rows[0];
+  },
+
+  updateSlot: async (slotId: string, dto: any): Promise<any> => {
+    const query = `
+      UPDATE teacher_attendance_slots 
+      SET teacher_id = COALESCE($2, teacher_id),
+          subject_id = COALESCE($3, subject_id),
+          target_class = COALESCE($4, target_class),
+          day_of_week = COALESCE($5, day_of_week),
+          start_time = COALESCE($6, start_time),
+          end_time = COALESCE($7, end_time),
+          classroom = COALESCE($8, classroom),
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1
+      RETURNING *;
+    `;
+    const values = [
+      slotId,
+      dto.teacherId,
+      dto.subjectId,
+      dto.targetClass,
+      dto.dayOfWeek,
+      dto.startTime,
+      dto.endTime,
+      dto.classroom,
+    ];
+    const { rows } = await pool.query(query, values);
+    return rows[0];
+  },
+
+  deleteSlot: async (slotId: string): Promise<any> => {
+    const query = `DELETE FROM teacher_attendance_slots WHERE id = $1 RETURNING *;`;
+    const { rows } = await pool.query(query, [slotId]);
     return rows[0];
   },
 };

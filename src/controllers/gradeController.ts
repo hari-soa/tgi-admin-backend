@@ -38,6 +38,49 @@ export const gradeController = {
     }
   },
 
+  getAll: async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const grades = await gradeService.getAllGrades();
+      res.status(200).json({ status: "success", data: { grades } });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  getById: async (
+    req: Request<{ id: string }>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const grade = await gradeService.getGradeById(req.params.id);
+      res.status(200).json({ status: "success", data: { grade } });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  update: async (
+    req: Request<{ id: string }, {}, any>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const grade = await gradeService.updateGrade(req.params.id, req.body);
+      res.status(200).json({
+        status: "success",
+        message: "Grade updated successfully",
+        data: { grade },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
   review: async (
     req: Request<{ id: string }, {}, { status: string }> & {
       user?: { userId: string };
@@ -63,14 +106,14 @@ export const gradeController = {
     }
   },
 
-  getById: async (
+  delete: async (
     req: Request<{ id: string }>,
     res: Response,
     next: NextFunction,
   ): Promise<void> => {
     try {
-      const grade = await gradeService.getGradeById(req.params.id);
-      res.status(200).json({ status: "success", data: { grade } });
+      const result = await gradeService.deleteGrade(req.params.id);
+      res.status(200).json({ status: "success", ...result });
     } catch (error) {
       next(error);
     }
