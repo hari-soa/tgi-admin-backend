@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from "express";
+import { Request, Response } from "express";
 import {
   CreateAdministratorDto,
   CreateStudentDto,
@@ -6,164 +6,139 @@ import {
   CreateTeacherDto,
 } from "../dtos/userDto";
 import { userService } from "../services/userService";
+import { AuthenticatedRequest } from "../middlewares/authMiddleware";
+import { UserRole } from "../models/userModel";
+import { catchAsync } from "../utils/catchAsync";
+
+type IdParams = { id: string };
+type ListUsersQuery = { role?: UserRole; classGroup?: string; search?: string };
 
 export const userController = {
-  getAllUsers: async (
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const users = await userService.getAllUsers();
+  getAllUsers: catchAsync(
+    async (
+      req: Request<unknown, unknown, unknown, ListUsersQuery>,
+      res: Response,
+    ): Promise<void> => {
+      const users = await userService.getAllUsers(req.query);
       res.status(200).json({
         status: "success",
         results: users.length,
         data: { users },
       });
-    } catch (error) {
-      next(error);
-    }
-  },
+    },
+  ),
 
-  createAdministrator: async (
-    req: Request<{}, {}, CreateAdministratorDto>,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
+  getStaff: catchAsync(async (_req: Request, res: Response): Promise<void> => {
+    const users = await userService.getStaff();
+    res.status(200).json({
+      status: "success",
+      results: users.length,
+      data: { users },
+    });
+  }),
+
+  createAdministrator: catchAsync(
+    async (
+      req: Request<unknown, unknown, CreateAdministratorDto>,
+      res: Response,
+    ): Promise<void> => {
       const user = await userService.createAdministrator(req.body);
       res.status(201).json({
         status: "success",
         message: "Administrator created successfully",
         data: { user },
       });
-    } catch (error) {
-      next(error);
-    }
-  },
+    },
+  ),
 
-  createStudent: async (
-    req: Request<{}, {}, CreateStudentDto>,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
+  createStudent: catchAsync(
+    async (
+      req: Request<unknown, unknown, CreateStudentDto>,
+      res: Response,
+    ): Promise<void> => {
       const user = await userService.createStudent(req.body);
       res.status(201).json({
         status: "success",
         message: "Student created successfully",
         data: { user },
       });
-    } catch (error) {
-      next(error);
-    }
-  },
+    },
+  ),
 
-  createSecretary: async (
-    req: Request<{}, {}, CreateSecretaryDto>,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
+  createSecretary: catchAsync(
+    async (
+      req: Request<unknown, unknown, CreateSecretaryDto>,
+      res: Response,
+    ): Promise<void> => {
       const user = await userService.createSecretary(req.body);
       res.status(201).json({
         status: "success",
         message: "Secretary created successfully",
         data: { user },
       });
-    } catch (error) {
-      next(error);
-    }
-  },
+    },
+  ),
 
-  createTeacher: async (
-    req: Request<{}, {}, CreateTeacherDto>,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
+  createTeacher: catchAsync(
+    async (
+      req: Request<unknown, unknown, CreateTeacherDto>,
+      res: Response,
+    ): Promise<void> => {
       const user = await userService.createTeacher(req.body);
       res.status(201).json({
         status: "success",
         message: "Teacher created successfully",
         data: { user },
       });
-    } catch (error) {
-      next(error);
-    }
-  },
+    },
+  ),
 
-  getUserById: async (
-    req: Request<{ id: string }>,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
+  getUserById: catchAsync(
+    async (req: Request<IdParams>, res: Response): Promise<void> => {
       const user = await userService.getUserById(req.params.id);
-      res.status(200).json({
-        status: "success",
-        data: { user },
-      });
-    } catch (error) {
-      next(error);
-    }
-  },
+      res.status(200).json({ status: "success", data: { user } });
+    },
+  ),
 
-  getMyProfile: async (
-    req: Request & { user?: { userId: string; role: string } },
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
+  getMyProfile: catchAsync(
+    async (req: AuthenticatedRequest, res: Response): Promise<void> => {
       const requester = req.user!;
       const user = await userService.getUserProfile(
         requester.userId,
         requester,
       );
-      res.status(200).json({
-        status: "success",
-        data: { user },
-      });
-    } catch (error) {
-      next(error);
-    }
-  },
+      res.status(200).json({ status: "success", data: { user } });
+    },
+  ),
 
-  updateUser: async (
-    req: Request<{ id: string }, {}, any> & { user?: { role: string } },
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const targetId = req.params.id;
-      const requesterRole = req.user!.role;
-      const updatedUser = await userService.updateUser(
-        targetId,
-        req.body,
-        requesterRole,
-      );
-
+  updateUser: catchAsync(
+    async (req: Request<IdParams>, res: Response): Promise<void> => {
+      const user = await userService.updateUser(req.params.id, req.body);
       res.status(200).json({
         status: "success",
         message: "User updated successfully",
-        data: { user: updatedUser },
+        data: { user },
       });
-    } catch (error) {
-      next(error);
-    }
-  },
+    },
+  ),
 
-  deactivateStudent: async (
-    req: Request<{ id: string }> & { user?: { role: string } },
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const targetId = req.params.id;
-      await userService.deactivateStudent(targetId);
+  deactivateStudent: catchAsync(
+    async (req: Request<IdParams>, res: Response): Promise<void> => {
+      await userService.deactivateStudent(req.params.id);
+      res.status(200).json({
+        status: "success",
+        message: "Student account deactivated successfully",
+      });
+    },
+  ),
+
+  deleteUser: catchAsync(
+    async (
+      req: AuthenticatedRequest<IdParams>,
+      res: Response,
+    ): Promise<void> => {
+      await userService.deleteUser(req.params.id, req.user!.userId);
       res.status(204).send();
-    } catch (error) {
-      next(error);
-    }
-  },
+    },
+  ),
 };

@@ -24,6 +24,11 @@ export interface SubjectGradeBreakdown {
   subjectOverallAverage: number;
 }
 
+export type SubjectGradeField = Exclude<
+  keyof SubjectGradeBreakdown,
+  "subjectId" | "subjectName" | "coefficient" | "subjectOverallAverage"
+>;
+
 export interface AnnualResult {
   id: string;
   studentId: string;

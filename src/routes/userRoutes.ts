@@ -15,6 +15,7 @@ router.use(authenticate);
 
 router.get("/", authorize("ADMIN", "SECRETARY"), userController.getAllUsers);
 router.get("/me", userController.getMyProfile);
+router.get("/staff", userController.getStaff);
 
 router.post(
   "/admin",
@@ -45,11 +46,12 @@ router.post(
 );
 
 router.get("/:id", authorize("ADMIN", "SECRETARY"), userController.getUserById);
-router.patch("/:id", authorize("ADMIN"), userController.updateUser);
 router.patch(
   "/students/:id/deactivate",
   authorize("ADMIN"),
   userController.deactivateStudent,
 );
+router.patch("/:id", authorize("ADMIN"), userController.updateUser);
+router.delete("/:id", authorize("ADMIN"), userController.deleteUser);
 
 export default router;

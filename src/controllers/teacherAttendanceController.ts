@@ -1,121 +1,135 @@
-import { Request, Response, NextFunction } from "express";
+import { Request, Response } from "express";
 import { teacherAttendanceService } from "../services/teacherAttendanceService";
+import { AuthenticatedRequest } from "../middlewares/authMiddleware";
+import { catchAsync } from "../utils/catchAsync";
+import {
+  CheckAttendanceDto,
+  CreateAttendanceSlotDto,
+  MarkAbsenceDto,
+  UpdateAttendanceMotifDto,
+  UpdateAttendanceSlotDto,
+} from "../dtos/teacherAttendanceDto";
+
+type SlotParams = { slotId: string };
+type DailyQuery = { day: string; date: string };
+type SummaryQuery = { teacherId?: string };
 
 export const teacherAttendanceController = {
-  createSlot: async (
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
+  createSlot: catchAsync(
+    async (
+      req: Request<unknown, unknown, CreateAttendanceSlotDto>,
+      res: Response,
+    ): Promise<void> => {
       const slot = await teacherAttendanceService.createSlot(req.body);
-      res.status(201).json({ status: "success", data: slot });
-    } catch (error) {
-      next(error);
-    }
-  },
+      res.status(201).json({
+        status: "success",
+        message: "Attendance slot created successfully",
+        data: { slot },
+      });
+    },
+  ),
 
-  getDailyCards: async (
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const { day, date } = req.query;
-      const cards = await teacherAttendanceService.getDailyCards(
-        day as string,
-        date as string,
-      );
-      res.status(200).json({ status: "success", data: cards });
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  checkAttendance: async (
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const { slotId, attendanceDate } = req.body;
-      const userId = (req as any).user.id;
-      const attendance = await teacherAttendanceService.checkAttendance(
-        slotId,
-        attendanceDate,
-        userId,
-      );
-      res.status(200).json({ status: "success", data: attendance });
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  updateMotif: async (
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const slotId = req.params.slotId as string;
-      const { attendanceDate, motif } = req.body;
-      const userRole = (req as any).user.role;
-      const attendance = await teacherAttendanceService.updateMotif(
-        slotId,
-        attendanceDate,
-        motif,
-        userRole,
-      );
-      res.status(200).json({ status: "success", data: attendance });
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  updateSlot: async (
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const slotId = req.params.slotId as string;
-      const updated = await teacherAttendanceService.updateSlot(
-        slotId,
+  updateSlot: catchAsync(
+    async (
+      req: Request<SlotParams, unknown, UpdateAttendanceSlotDto>,
+      res: Response,
+    ): Promise<void> => {
+      const slot = await teacherAttendanceService.updateSlot(
+        req.params.slotId,
         req.body,
       );
-      res.status(200).json({ status: "success", data: updated });
-    } catch (error) {
-      next(error);
-    }
-  },
+      res.status(200).json({
+        status: "success",
+        message: "Attendance slot updated successfully",
+        data: { slot },
+      });
+    },
+  ),
 
-  deleteSlot: async (
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const slotId = req.params.slotId as string;
-      await teacherAttendanceService.deleteSlot(slotId);
+  deleteSlot: catchAsync(
+    async (req: Request<SlotParams>, res: Response): Promise<void> => {
+      await teacherAttendanceService.deleteSlot(req.params.slotId);
       res.status(204).send();
-    } catch (error) {
-      next(error);
-    }
-  },
+    },
+  ),
 
-  getSummaryCards: async (
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const { teacherId } = req.query;
-      const summaries = await teacherAttendanceService.getSummaryCards(
-        teacherId as string,
+  getDailyCards: catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      // day and date are guaranteed by dailyAttendanceQuerySchema
+      const { day, date } = req.query as DailyQuery;
+      const cards = await teacherAttendanceService.getDailyCards(day, date);
+      res.status(200).json({
+        status: "success",
+        results: cards.length,
+        data: { cards },
+      });
+    },
+  ),
+
+  checkAttendance: catchAsync(
+    async (
+      req: AuthenticatedRequest<unknown, CheckAttendanceDto>,
+      res: Response,
+    ): Promise<void> => {
+      const attendance = await teacherAttendanceService.checkAttendance(
+        req.body,
+        req.user!.userId,
       );
-      res.status(200).json({ status: "success", data: summaries });
-    } catch (error) {
-      next(error);
-    }
-  },
+      res.status(200).json({
+        status: "success",
+        message: "Attendance recorded successfully",
+        data: { attendance },
+      });
+    },
+  ),
+
+  markAbsence: catchAsync(
+    async (
+      req: AuthenticatedRequest<unknown, MarkAbsenceDto>,
+      res: Response,
+    ): Promise<void> => {
+      const attendance = await teacherAttendanceService.markAbsence(
+        req.body,
+        req.user!.userId,
+      );
+      res.status(200).json({
+        status: "success",
+        message: "Absence recorded successfully",
+        data: { attendance },
+      });
+    },
+  ),
+
+  updateMotif: catchAsync(
+    async (
+      req: Request<SlotParams, unknown, UpdateAttendanceMotifDto>,
+      res: Response,
+    ): Promise<void> => {
+      const attendance = await teacherAttendanceService.updateMotif(
+        req.params.slotId,
+        req.body,
+      );
+      res.status(200).json({
+        status: "success",
+        message: "Motif updated successfully",
+        data: { attendance },
+      });
+    },
+  ),
+
+  getSummaryCards: catchAsync(
+    async (
+      req: Request<unknown, unknown, unknown, SummaryQuery>,
+      res: Response,
+    ): Promise<void> => {
+      const summaries = await teacherAttendanceService.getSummaryCards(
+        req.query.teacherId,
+      );
+      res.status(200).json({
+        status: "success",
+        results: summaries.length,
+        data: { summaries },
+      });
+    },
+  ),
 };

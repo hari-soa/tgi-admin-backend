@@ -15,6 +15,15 @@ const router = Router();
 
 router.use(authenticate);
 
+router.get(
+  "/history/student/:studentId",
+  disciplinaryController.getStudentHistory,
+);
+router.get(
+  "/remarks/student/:studentId",
+  disciplinaryController.getStudentRemarks,
+);
+
 router.post(
   "/history",
   authorize("ADMIN"),

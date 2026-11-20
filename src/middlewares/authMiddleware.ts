@@ -2,13 +2,16 @@ import { Request, Response, NextFunction } from "express";
 import { verifyToken, TokenPayload } from "../utils/jwt";
 import { AppError } from "../utils/AppError";
 
-export interface AuthenticatedRequest extends Request {
+export interface AuthenticatedRequest<
+  TParams = Request["params"],
+  TBody = unknown,
+> extends Request<TParams, unknown, TBody> {
   user?: TokenPayload;
 }
 
 export const authenticate = (
   req: AuthenticatedRequest,
-  res: Response,
+  _res: Response,
   next: NextFunction,
 ): void => {
   const authHeader = req.headers.authorization;
@@ -20,18 +23,17 @@ export const authenticate = (
   const token = authHeader.split(" ")[1];
 
   try {
-    const decoded = verifyToken(token);
-    req.user = decoded;
+    req.user = verifyToken(token);
     next();
-  } catch (error) {
-    return next(new AppError("Invalid or expired token.", 401));
+  } catch {
+    next(new AppError("Invalid or expired token.", 401));
   }
 };
 
 export const authorize = (...roles: string[]) => {
   return (
     req: AuthenticatedRequest,
-    res: Response,
+    _res: Response,
     next: NextFunction,
   ): void => {
     if (!req.user || !roles.includes(req.user.role)) {

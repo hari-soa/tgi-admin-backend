@@ -1,9 +1,5 @@
 export type StudentHistoryType =
-  | "ABSENCE"
-  | "LATENESS"
-  | "SUSPENSION"
-  | "INFIRMARY"
-  | "EARLY_LEAVE_PERMIT";
+  "ABSENCE" | "LATENESS" | "SUSPENSION" | "INFIRMARY" | "EARLY_LEAVE_PERMIT";
 
 export interface StudentHistoryRecord {
   id: string;

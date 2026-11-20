@@ -15,6 +15,9 @@ export interface Announcement {
   authorId: string;
   targetScope: TargetScope;
   targetValue?: string;
+  targetClasses: string[];
+  authorFirstName?: string;
+  authorLastName?: string;
   priority: AnnouncementPriority;
   createdAt: Date;
   updatedAt?: Date;

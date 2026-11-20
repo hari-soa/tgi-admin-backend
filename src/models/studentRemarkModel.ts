@@ -1,9 +1,5 @@
 export type RemarkCategory =
-  | "BEHAVIOR"
-  | "ACADEMIC"
-  | "WARNING"
-  | "ENCOURAGEMENT"
-  | "OTHER";
+  "BEHAVIOR" | "ACADEMIC" | "WARNING" | "ENCOURAGEMENT" | "OTHER";
 
 export interface StudentRemark {
   id: string;

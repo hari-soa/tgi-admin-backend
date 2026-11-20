@@ -7,11 +7,9 @@ export const createAdministratorSchema = z.object({
     lastName: z.string({ message: "Last name is required" }).min(2).trim(),
     matricule: z.string({ message: "Matricule is required" }).min(2).trim(),
     gender: z.enum(genderEnum, { message: "Invalid gender option" }),
-    password: z.string().min(8).optional(),
     contactNumber: z.string().optional(),
     email: z.string().email().trim().toLowerCase().optional(),
     profilePictureUrl: z.string().url().optional(),
-    role: z.string().optional(),
   }),
 });
 
@@ -27,8 +25,7 @@ export const updateAdministratorSchema = z.object({
     contactNumber: z.string().optional(),
     email: z.string().email().trim().toLowerCase().optional(),
     profilePictureUrl: z.string().optional(),
-    gender: z.enum(["MALE", "FEMALE"]).optional(),
-    role: z.string().optional(),
+    gender: z.enum(genderEnum).optional(),
   }),
 });
 

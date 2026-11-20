@@ -13,6 +13,7 @@ export interface User {
   role: UserRole;
   gender: Gender;
   profilePictureUrl?: string;
+  isActive?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }

@@ -1,37 +1,71 @@
-import { userRepository } from "../repositories/userRepository";
+import bcrypt from "bcrypt";
+import { ZodObject } from "zod";
+import { userRepository, UserFilters } from "../repositories/userRepository";
 import {
   CreateAdministratorDto,
   CreateStudentDto,
   CreateSecretaryDto,
   CreateTeacherDto,
+  updateAdministratorSchema,
+  updateSecretarySchema,
+  updateStudentSchema,
+  updateTeacherSchema,
 } from "../dtos/userDto";
 import { AppError } from "../utils/AppError";
-import { User } from "../models/userModel";
-import bcrypt from "bcrypt";
+import { TokenPayload } from "../utils/jwt";
+import { assertCanAccessStudentData } from "../utils/accessControl";
+import { User, UserRole } from "../models/userModel";
+
+const PASSWORD_SALT_ROUNDS = 10;
+
+const UPDATE_SCHEMA_BY_ROLE: Record<UserRole, ZodObject> = {
+  ADMIN: updateAdministratorSchema,
+  STUDENT: updateStudentSchema,
+  SECRETARY: updateSecretarySchema,
+  TEACHER: updateTeacherSchema,
+};
+
+/**
+ * The matricule is the login credential of every account: it is hashed as
+ * the initial password, so it must be unique like the email.
+ */
+const assertEmailAndMatriculeAreFree = async (
+  email: string | undefined,
+  matricule: string,
+  currentUserId?: string,
+): Promise<void> => {
+  if (email) {
+    const userWithEmail = await userRepository.findByEmail(email);
+    if (userWithEmail && userWithEmail.id !== currentUserId) {
+      throw new AppError(
+        "An account with this email address already exists",
+        400,
+      );
+    }
+  }
+
+  const userWithMatricule = await userRepository.findByMatricule(matricule);
+  if (userWithMatricule && userWithMatricule.id !== currentUserId) {
+    throw new AppError("A user with this matricule already exists", 400);
+  }
+};
+
+const hashPassword = (plainPassword: string): Promise<string> =>
+  bcrypt.hash(plainPassword, PASSWORD_SALT_ROUNDS);
 
 export const userService = {
-  getAllUsers: async (): Promise<User[]> => {
-    return userRepository.getAllUsers();
+  getAllUsers: async (filters: UserFilters): Promise<User[]> => {
+    return userRepository.getAllUsers(filters);
+  },
+
+  getStaff: async (): Promise<User[]> => {
+    const everyone = await userRepository.getAllUsers();
+    return everyone.filter((user) => user.role !== "STUDENT");
   },
 
   createAdministrator: async (dto: CreateAdministratorDto): Promise<User> => {
-    if (dto.email) {
-      const existingUser = await userRepository.findByEmail(dto.email);
-      if (existingUser) {
-        throw new AppError(
-          "An account with this email address already exists",
-          400,
-        );
-      }
-    }
-    const existingMatricule = await userRepository.findByMatricule(
-      dto.matricule,
-    );
-    if (existingMatricule) {
-      throw new AppError("A user with this matricule already exists", 400);
-    }
-
-    const hashedPassword = await bcrypt.hash(dto.matricule, 10);
+    await assertEmailAndMatriculeAreFree(dto.email, dto.matricule);
+    const hashedPassword = await hashPassword(dto.matricule);
     return userRepository.createAdministrator(
       dto,
       dto.matricule,
@@ -40,65 +74,20 @@ export const userService = {
   },
 
   createStudent: async (dto: CreateStudentDto): Promise<User> => {
-    if (dto.email) {
-      const existingUser = await userRepository.findByEmail(dto.email);
-      if (existingUser) {
-        throw new AppError(
-          "An account with this email address already exists",
-          400,
-        );
-      }
-    }
-    const existingMatricule = await userRepository.findByMatricule(
-      dto.matricule,
-    );
-    if (existingMatricule) {
-      throw new AppError("A user with this matricule already exists", 400);
-    }
-
-    const hashedPassword = await bcrypt.hash(dto.matricule, 10);
+    await assertEmailAndMatriculeAreFree(dto.email, dto.matricule);
+    const hashedPassword = await hashPassword(dto.matricule);
     return userRepository.createStudent(dto, dto.matricule, hashedPassword);
   },
 
   createSecretary: async (dto: CreateSecretaryDto): Promise<User> => {
-    if (dto.email) {
-      const existingUser = await userRepository.findByEmail(dto.email);
-      if (existingUser) {
-        throw new AppError(
-          "An account with this email address already exists",
-          400,
-        );
-      }
-    }
-    const existingMatricule = await userRepository.findByMatricule(
-      dto.matricule,
-    );
-    if (existingMatricule) {
-      throw new AppError("A user with this matricule already exists", 400);
-    }
-
-    const hashedPassword = await bcrypt.hash(dto.matricule, 10);
+    await assertEmailAndMatriculeAreFree(dto.email, dto.matricule);
+    const hashedPassword = await hashPassword(dto.matricule);
     return userRepository.createSecretary(dto, dto.matricule, hashedPassword);
   },
 
   createTeacher: async (dto: CreateTeacherDto): Promise<User> => {
-    if (dto.email) {
-      const existingUser = await userRepository.findByEmail(dto.email);
-      if (existingUser) {
-        throw new AppError(
-          "An account with this email address already exists",
-          400,
-        );
-      }
-    }
-    const existingMatricule = await userRepository.findByMatricule(
-      dto.matricule,
-    );
-    if (existingMatricule) {
-      throw new AppError("A user with this matricule already exists", 400);
-    }
-
-    const hashedPassword = await bcrypt.hash(dto.matricule, 10);
+    await assertEmailAndMatriculeAreFree(dto.email, dto.matricule);
+    const hashedPassword = await hashPassword(dto.matricule);
     return userRepository.createTeacher(dto, dto.matricule, hashedPassword);
   },
 
@@ -112,54 +101,53 @@ export const userService = {
 
   getUserProfile: async (
     targetUserId: string,
-    requestingUser: { userId: string; role: string },
-  ) => {
-    const targetUser =
-      await userRepository.findUserWithDetailsById(targetUserId);
+    requester: TokenPayload,
+  ): Promise<User> => {
+    const targetUser = await userRepository.findById(targetUserId);
     if (!targetUser) {
       throw new AppError("User not found", 404);
     }
-    const { userId: requesterId, role: requesterRole } = requestingUser;
 
-    if (requesterRole === "ADMIN" || requesterId === targetUserId) {
-      return targetUser;
-    }
-    if (requesterRole === "STUDENT" && targetUser.role === "STUDENT") {
-      throw new AppError(
-        "You are not authorized to view another student's profile",
-        403,
-      );
+    if (targetUser.role === "STUDENT") {
+      assertCanAccessStudentData(requester, targetUserId);
     }
     return targetUser;
   },
 
   updateUser: async (
     targetUserId: string,
-    updateData: any,
-    requesterRole: string,
-  ) => {
-    if (requesterRole !== "ADMIN") {
-      throw new AppError(
-        "Only administrators are allowed to update user profiles",
-        403,
-      );
-    }
+    rawUpdateData: unknown,
+  ): Promise<User> => {
     const targetUser = await userRepository.findById(targetUserId);
     if (!targetUser) {
       throw new AppError("User not found", 404);
     }
 
-    if (updateData.password) {
-      updateData.password = await bcrypt.hash(updateData.password, 10);
-    }
+    const updateSchema = UPDATE_SCHEMA_BY_ROLE[targetUser.role];
+    const updateData = updateSchema.shape.body.parse(rawUpdateData) as Record<
+      string,
+      unknown
+    >;
+
+    const newMatricule = updateData.matricule as string | undefined;
+    const newEmail = updateData.email as string | undefined;
+    await assertEmailAndMatriculeAreFree(
+      newEmail,
+      newMatricule ?? targetUser.matricule,
+      targetUserId,
+    );
+
+    // The matricule is the credential: changing it renews the password unless
+    // an explicit password is given.
+    const passwordSource =
+      (updateData.password as string | undefined) ?? newMatricule;
+    const hashedPassword = passwordSource
+      ? await hashPassword(passwordSource)
+      : undefined;
 
     await userRepository.updateUserBase(targetUserId, {
-      firstName: updateData.firstName,
-      lastName: updateData.lastName,
-      email: updateData.email,
-      password: updateData.password,
-      contactNumber: updateData.contactNumber,
-      profilePictureUrl: updateData.profilePictureUrl,
+      ...updateData,
+      password: hashedPassword,
     });
 
     if (targetUser.role === "STUDENT") {
@@ -170,17 +158,27 @@ export const userService = {
       await userRepository.updateTeacherDetails(targetUserId, updateData);
     }
 
-    return userService.getUserProfile(targetUserId, {
-      userId: targetUserId,
-      role: "ADMIN",
-    });
+    return userService.getUserById(targetUserId);
   },
 
   deactivateStudent: async (targetUserId: string): Promise<void> => {
     const targetUser = await userRepository.findById(targetUserId);
-    if (!targetUser) {
-      throw new AppError("User not found", 404);
+    if (!targetUser || targetUser.role !== "STUDENT") {
+      throw new AppError("Student not found", 404);
     }
     await userRepository.deactivateStudent(targetUserId);
+  },
+
+  deleteUser: async (
+    targetUserId: string,
+    requesterId: string,
+  ): Promise<void> => {
+    if (targetUserId === requesterId) {
+      throw new AppError("You cannot delete your own account", 400);
+    }
+    const deleted = await userRepository.deleteUser(targetUserId);
+    if (!deleted) {
+      throw new AppError("User not found", 404);
+    }
   },
 };

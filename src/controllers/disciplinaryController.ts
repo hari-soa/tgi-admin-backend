@@ -1,122 +1,134 @@
-import { Request, Response, NextFunction } from "express";
+import { Request, Response } from "express";
 import { disciplinaryService } from "../services/disciplinaryService";
+import { AuthenticatedRequest } from "../middlewares/authMiddleware";
+import { catchAsync } from "../utils/catchAsync";
+import {
+  CreateStudentHistoryRecordDto,
+  UpdateStudentHistoryRecordDto,
+} from "../dtos/studentHistoryDto";
+import {
+  CreateStudentRemarkDto,
+  UpdateStudentRemarkDto,
+} from "../dtos/studentRemarkDto";
+
+type IdParams = { id: string };
+type StudentParams = { studentId: string };
 
 export const disciplinaryController = {
-  createHistoryRecord: async (
-    req: Request<{}, {}, any> & { user?: { userId: string } },
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const adminId = req.user!.userId;
+  createHistoryRecord: catchAsync(
+    async (
+      req: AuthenticatedRequest<unknown, CreateStudentHistoryRecordDto>,
+      res: Response,
+    ): Promise<void> => {
       const record = await disciplinaryService.addHistoryRecord(
         req.body,
-        adminId,
+        req.user!.userId,
       );
-
       res.status(201).json({
         status: "success",
-        message: "Student history record created successfully",
+        message: "History record added successfully",
         data: { record },
       });
-    } catch (error) {
-      next(error);
-    }
-  },
+    },
+  ),
 
-  updateHistoryRecord: async (
-    req: Request<{ id: string }>,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
+  getStudentHistory: catchAsync(
+    async (
+      req: AuthenticatedRequest<StudentParams>,
+      res: Response,
+    ): Promise<void> => {
+      const records = await disciplinaryService.getStudentHistory(
+        req.params.studentId,
+        req.user!,
+      );
+      res.status(200).json({
+        status: "success",
+        results: records.length,
+        data: { records },
+      });
+    },
+  ),
+
+  updateHistoryRecord: catchAsync(
+    async (
+      req: Request<IdParams, unknown, UpdateStudentHistoryRecordDto>,
+      res: Response,
+    ): Promise<void> => {
       const record = await disciplinaryService.updateHistoryRecord(
         req.params.id,
         req.body,
       );
       res.status(200).json({
         status: "success",
-        message: "Student history record updated successfully",
+        message: "History record updated successfully",
         data: { record },
       });
-    } catch (error) {
-      next(error);
-    }
-  },
+    },
+  ),
 
-  deleteHistoryRecord: async (
-    req: Request<{ id: string }>,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
+  deleteHistoryRecord: catchAsync(
+    async (req: Request<IdParams>, res: Response): Promise<void> => {
       await disciplinaryService.deleteHistoryRecord(req.params.id);
-      res.status(200).json({
-        status: "success",
-        message: "Student history record deleted successfully",
-      });
-    } catch (error) {
-      next(error);
-    }
-  },
+      res.status(204).send();
+    },
+  ),
 
-  createRemark: async (
-    req: Request<{}, {}, any> & { user?: { userId: string; role: string } },
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const authorId = req.user!.userId;
-      const authorRole = req.user!.role;
+  createRemark: catchAsync(
+    async (
+      req: AuthenticatedRequest<unknown, CreateStudentRemarkDto>,
+      res: Response,
+    ): Promise<void> => {
       const remark = await disciplinaryService.addRemark(
         req.body,
-        authorId,
-        authorRole,
+        req.user!.userId,
+        req.user!.role,
       );
-
       res.status(201).json({
         status: "success",
-        message: "Student remark added successfully",
+        message: "Remark added successfully",
         data: { remark },
       });
-    } catch (error) {
-      next(error);
-    }
-  },
+    },
+  ),
 
-  updateRemark: async (
-    req: Request<{ id: string }>,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
+  getStudentRemarks: catchAsync(
+    async (
+      req: AuthenticatedRequest<StudentParams>,
+      res: Response,
+    ): Promise<void> => {
+      const remarks = await disciplinaryService.getStudentRemarks(
+        req.params.studentId,
+        req.user!,
+      );
+      res.status(200).json({
+        status: "success",
+        results: remarks.length,
+        data: { remarks },
+      });
+    },
+  ),
+
+  updateRemark: catchAsync(
+    async (
+      req: Request<IdParams, unknown, UpdateStudentRemarkDto>,
+      res: Response,
+    ): Promise<void> => {
       const remark = await disciplinaryService.updateRemark(
         req.params.id,
         req.body,
       );
       res.status(200).json({
         status: "success",
-        message: "Student remark updated successfully",
+        message: "Remark updated successfully",
         data: { remark },
       });
-    } catch (error) {
-      next(error);
-    }
-  },
+    },
+  ),
 
-  deleteRemark: async (
-    req: Request<{ id: string }>,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
+  deleteRemark: catchAsync(
+    async (req: Request<IdParams>, res: Response): Promise<void> => {
       await disciplinaryService.deleteRemark(req.params.id);
-      res.status(200).json({
-        status: "success",
-        message: "Student remark deleted successfully",
-      });
-    } catch (error) {
-      next(error);
-    }
-  },
+      res.status(204).send();
+    },
+  ),
 };

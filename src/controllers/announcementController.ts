@@ -1,100 +1,79 @@
-import { Request, Response, NextFunction } from "express";
+import { Request, Response } from "express";
 import { announcementService } from "../services/announcementService";
+import { AuthenticatedRequest } from "../middlewares/authMiddleware";
+import { catchAsync } from "../utils/catchAsync";
+import {
+  CreateAnnouncementDto,
+  UpdateAnnouncementDto,
+} from "../dtos/announcementDto";
+
+type IdParams = { id: string };
 
 export const announcementController = {
-  create: async (
-    req: Request<{}, {}, any> & { user?: { userId: string } },
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const authorId = req.user!.userId;
-      const { targetClasses, ...dto } = req.body;
+  create: catchAsync(
+    async (
+      req: AuthenticatedRequest<unknown, CreateAnnouncementDto>,
+      res: Response,
+    ): Promise<void> => {
       const announcement = await announcementService.createAnnouncement(
-        dto,
-        authorId,
-        targetClasses,
+        req.body,
+        req.user!.userId,
       );
-
       res.status(201).json({
         status: "success",
         message: "Announcement created successfully",
         data: { announcement },
       });
-    } catch (error) {
-      next(error);
-    }
-  },
+    },
+  ),
 
-  getAll: async (
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const announcements = await announcementService.getAllAnnouncements();
+  getAll: catchAsync(
+    async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+      const announcements = await announcementService.getAllAnnouncements(
+        req.user!,
+      );
       res.status(200).json({
         status: "success",
+        results: announcements.length,
         data: { announcements },
       });
-    } catch (error) {
-      next(error);
-    }
-  },
+    },
+  ),
 
-  getById: async (
-    req: Request<{ id: string }>,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
+  getById: catchAsync(
+    async (
+      req: AuthenticatedRequest<IdParams>,
+      res: Response,
+    ): Promise<void> => {
       const announcement = await announcementService.getAnnouncementById(
         req.params.id,
+        req.user!,
       );
-      res.status(200).json({
-        status: "success",
-        data: { announcement },
-      });
-    } catch (error) {
-      next(error);
-    }
-  },
-  update: async (
-    req: Request<{ id: string }, {}, any>,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const { targetClasses, ...dto } = req.body;
+      res.status(200).json({ status: "success", data: { announcement } });
+    },
+  ),
+
+  update: catchAsync(
+    async (
+      req: Request<IdParams, unknown, UpdateAnnouncementDto>,
+      res: Response,
+    ): Promise<void> => {
       const announcement = await announcementService.updateAnnouncement(
         req.params.id,
-        dto,
-        targetClasses,
+        req.body,
       );
-
       res.status(200).json({
         status: "success",
         message: "Announcement updated successfully",
         data: { announcement },
       });
-    } catch (error) {
-      next(error);
-    }
-  },
+    },
+  ),
 
-  delete: async (
-    req: Request<{ id: string }>,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
+  delete: catchAsync(
+    async (req: Request<IdParams>, res: Response): Promise<void> => {
       await announcementService.deleteAnnouncement(req.params.id);
-      res.status(200).json({
-        status: "success",
-        message: "Announcement deleted successfully",
-      });
-    } catch (error) {
-      next(error);
-    }
-  },
+      res.status(204).send();
+    },
+  ),
 };

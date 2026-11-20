@@ -14,17 +14,7 @@ export const subjectService = {
         );
       }
     }
-    try {
-      return await subjectRepository.create(dto);
-    } catch (error: any) {
-      if (
-        error.message &&
-        error.message.includes("already exists and is active")
-      ) {
-        throw new AppError(error.message, 400);
-      }
-      throw error;
-    }
+    return subjectRepository.create(dto);
   },
 
   updateSubject: async (id: string, dto: UpdateSubjectDto) => {
