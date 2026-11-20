@@ -12,6 +12,7 @@ export interface LoginResult {
     lastName: string;
     email?: string;
     role: string;
+    profilePictureUrl?: string;
   };
   redirectUrl: string;
 }
@@ -27,6 +28,13 @@ export const authService = {
     const isPasswordValid = await bcrypt.compare(dto.matricule, user.password);
     if (!isPasswordValid) {
       throw new AppError("Invalid email or matricule", 401);
+    }
+
+    if (user.role === "STUDENT" && user.isActive === false) {
+      throw new AppError(
+        "This account has been deactivated. Please contact the administration.",
+        403,
+      );
     }
 
     const redirectUrl = user.role === "ADMIN" ? "/dashboard" : "/home";
@@ -45,6 +53,7 @@ export const authService = {
         lastName: user.lastName,
         email: user.email,
         role: user.role,
+        profilePictureUrl: user.profilePictureUrl,
       },
       redirectUrl,
     };

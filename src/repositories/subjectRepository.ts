@@ -1,5 +1,13 @@
 import { pool } from "../config/db";
 import { CreateSubjectDto, UpdateSubjectDto } from "../dtos/subjectDto";
+import { AppError } from "../utils/AppError";
+import { buildUpdateStatement } from "../utils/sqlUpdate";
+
+const SUBJECT_UPDATE_COLUMN_MAPPING: Record<string, string> = {
+  name: "name",
+  coefficient: "coefficient",
+  description: "description",
+};
 
 export const subjectRepository = {
   create: async (dto: CreateSubjectDto): Promise<any> => {
@@ -19,8 +27,9 @@ export const subjectRepository = {
           assignment.classGroup,
         ]);
         if (existing.rows.length > 0) {
-          throw new Error(
+          throw new AppError(
             `Subject '${dto.name}' already exists and is active for class '${assignment.classGroup}'`,
+            400,
           );
         }
       }
@@ -28,7 +37,7 @@ export const subjectRepository = {
       const subjectQuery = `
         INSERT INTO subjects (name, coefficient, description, is_active)
         VALUES ($1, $2, $3, TRUE)
-        RETURNING id, name, coefficient, description, is_active AS "isActive", created_at AS "createdAt";
+        RETURNING id, name, coefficient::float AS coefficient, description, is_active AS "isActive", created_at AS "createdAt";
       `;
       const { rows } = await client.query(subjectQuery, [
         dto.name,
@@ -64,28 +73,15 @@ export const subjectRepository = {
     try {
       await client.query("BEGIN");
 
-      const fields: string[] = [];
-      const values: any[] = [];
-      let idx = 1;
-
-      if (dto.name !== undefined) {
-        fields.push(`name = $${idx++}`);
-        values.push(dto.name);
-      }
-      if (dto.coefficient !== undefined) {
-        fields.push(`coefficient = $${idx++}`);
-        values.push(dto.coefficient);
-      }
-      if (dto.description !== undefined) {
-        fields.push(`description = $${idx++}`);
-        values.push(dto.description);
-      }
-
-      if (fields.length > 0) {
-        fields.push(`updated_at = CURRENT_TIMESTAMP`);
-        values.push(id);
-        const updateQuery = `UPDATE subjects SET ${fields.join(", ")} WHERE id = $${idx}`;
-        await client.query(updateQuery, values);
+      const statement = buildUpdateStatement(
+        SUBJECT_UPDATE_COLUMN_MAPPING,
+        dto,
+      );
+      if (statement) {
+        await client.query(
+          `UPDATE subjects SET ${statement.setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $${statement.values.length + 1}`,
+          [...statement.values, id],
+        );
       }
 
       if (dto.assignments) {
@@ -124,7 +120,7 @@ export const subjectRepository = {
 
   findById: async (id: string): Promise<any | null> => {
     const subjectQuery = `
-      SELECT id, name, coefficient, description, is_active AS "isActive", created_at AS "createdAt"
+      SELECT id, name, coefficient::float AS coefficient, description, is_active AS "isActive", created_at AS "createdAt"
       FROM subjects
       WHERE id = $1
       LIMIT 1;
@@ -147,9 +143,9 @@ export const subjectRepository = {
     return subject;
   },
 
-  findAll: async (): Promise<any[]> => {
+  findAll: async (): Promise<Record<string, unknown>[]> => {
     const subjectsQuery = `
-      SELECT id, name, coefficient, description, is_active AS "isActive", created_at AS "createdAt"
+      SELECT id, name, coefficient::float AS coefficient, description, is_active AS "isActive", created_at AS "createdAt"
       FROM subjects
       WHERE is_active = TRUE
       ORDER BY name ASC;

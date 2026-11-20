@@ -24,9 +24,28 @@ export interface Grade {
   updatedAt?: Date;
 }
 
-export interface TermSubjectGrades {
+export type GradeSessionStatus = "OPEN" | "PENDING_REVIEW" | "VALIDATED";
+
+export interface GradeSessionEntry {
+  studentId: string;
+  value: number;
+  maxScore: number;
+}
+
+export interface GradeSession {
+  id: string;
+  classGroup: string;
   subjectId: string;
+  subjectName: string;
+  examType: ExamType;
   term: Term;
-  semiTrimesterGrade?: Grade;
-  trimesterGrade?: Grade;
+  academicYear: string;
+  status: GradeSessionStatus;
+  draftGrades: GradeSessionEntry[];
+  createdByAdminId: string;
+  submittedBySecretaryId?: string;
+  validatedByAdminId?: string;
+  createdAt?: Date;
+  submittedAt?: Date;
+  validatedAt?: Date;
 }

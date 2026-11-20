@@ -1,115 +1,151 @@
 import { teacherAttendanceRepository } from "../repositories/teacherAttendanceRepository";
-import { CreateAttendanceSlotDto } from "../dtos/teacherAttendanceDto";
+import {
+  CheckAttendanceDto,
+  CreateAttendanceSlotDto,
+  MarkAbsenceDto,
+  UpdateAttendanceMotifDto,
+  UpdateAttendanceSlotDto,
+} from "../dtos/teacherAttendanceDto";
+import { AttendanceStatus } from "../models/teacherAttendanceModel";
 import { AppError } from "../utils/AppError";
+import { getSchoolClock } from "../utils/schoolTime";
+
+const MAX_SIMULTANEOUS_CLASSROOMS = 2;
+const MINUTES_PER_HOUR = 60;
+
+const toMinutes = (time: string): number => {
+  const [hours, minutes] = time.split(":").map(Number);
+  return hours * MINUTES_PER_HOUR + minutes;
+};
+
+const assertSlotExists = async (slotId: string) => {
+  const slot = await teacherAttendanceRepository.findSlotById(slotId);
+  if (!slot) {
+    throw new AppError("Attendance slot not found", 404);
+  }
+  return slot;
+};
+
+const assertEndAfterStart = (startTime: string, endTime: string): void => {
+  if (toMinutes(endTime) <= toMinutes(startTime)) {
+    throw new AppError("The end time must be after the start time", 400);
+  }
+};
+
+const assertTeacherIsNotOverbooked = async (
+  teacherId: string,
+  dayOfWeek: string,
+  startTime: string,
+  endTime: string,
+  excludeSlotId?: string,
+): Promise<void> => {
+  const overlappingCount =
+    await teacherAttendanceRepository.countOverlappingSlots(
+      teacherId,
+      dayOfWeek,
+      startTime,
+      endTime,
+      excludeSlotId,
+    );
+
+  if (overlappingCount >= MAX_SIMULTANEOUS_CLASSROOMS) {
+    throw new AppError(
+      `Teacher cannot exceed ${MAX_SIMULTANEOUS_CLASSROOMS} simultaneous classrooms at this time slot`,
+      400,
+    );
+  }
+};
 
 export const teacherAttendanceService = {
-  createSlot: async (dto: CreateAttendanceSlotDto): Promise<any> => {
-    const overlappingCount =
-      await teacherAttendanceRepository.countOverlappingSlots(
-        dto.teacherId,
-        dto.dayOfWeek,
-        dto.startTime,
-        dto.endTime,
-      );
-
-    if (overlappingCount >= 2) {
-      throw new AppError(
-        "Teacher cannot exceed 2 simultaneous classrooms at this time slot",
-        400,
-      );
-    }
-
-    return await teacherAttendanceRepository.createSlot(dto);
-  },
-
-  updateSlot: async (slotId: string, dto: any): Promise<any> => {
-    const slot = await teacherAttendanceRepository.findSlotById(slotId);
-    if (!slot) {
-      throw new AppError("Attendance slot not found", 404);
-    }
-    return await teacherAttendanceRepository.updateSlot(slotId, dto);
-  },
-
-  deleteSlot: async (slotId: string): Promise<any> => {
-    const slot = await teacherAttendanceRepository.findSlotById(slotId);
-    if (!slot) {
-      throw new AppError("Attendance slot not found", 404);
-    }
-    return await teacherAttendanceRepository.deleteSlot(slotId);
-  },
-
-  getDailyCards: async (
-    dayOfWeek: string,
-    attendanceDate: string,
-  ): Promise<any[]> => {
-    return await teacherAttendanceRepository.getDailyCards(
-      dayOfWeek,
-      attendanceDate,
+  createSlot: async (dto: CreateAttendanceSlotDto) => {
+    assertEndAfterStart(dto.startTime, dto.endTime);
+    await assertTeacherIsNotOverbooked(
+      dto.teacherId,
+      dto.dayOfWeek,
+      dto.startTime,
+      dto.endTime,
     );
+    return teacherAttendanceRepository.createSlot(dto);
   },
 
-  checkAttendance: async (
-    slotId: string,
-    attendanceDate: string,
-    recordedBy: string,
-  ): Promise<any> => {
-    const slot = await teacherAttendanceRepository.findSlotById(slotId);
-    if (!slot) {
-      throw new AppError("Attendance slot not found", 404);
-    }
+  updateSlot: async (slotId: string, dto: UpdateAttendanceSlotDto) => {
+    const slot = await assertSlotExists(slotId);
 
-    const now = new Date();
-    const currentTimeStr = now.toTimeString().slice(0, 8);
-
-    let status = "PRESENT";
-    let lateMinutes = 0;
-
-    if (currentTimeStr > slot.start_time) {
-      status = "LATE";
-      const [startHour, startMin] = slot.start_time.split(":").map(Number);
-      const currentHour = now.getHours();
-      const currentMin = now.getMinutes();
-
-      lateMinutes = currentHour * 60 + currentMin - (startHour * 60 + startMin);
-      if (lateMinutes < 0) lateMinutes = 0;
-    }
-
-    return await teacherAttendanceRepository.upsertAttendance(
+    const mergedSlot = { ...slot, ...dto };
+    assertEndAfterStart(mergedSlot.startTime, mergedSlot.endTime);
+    await assertTeacherIsNotOverbooked(
+      mergedSlot.teacherId,
+      mergedSlot.dayOfWeek,
+      mergedSlot.startTime,
+      mergedSlot.endTime,
       slotId,
-      attendanceDate,
+    );
+
+    return teacherAttendanceRepository.updateSlot(slotId, dto);
+  },
+
+  deleteSlot: async (slotId: string): Promise<void> => {
+    await assertSlotExists(slotId);
+    await teacherAttendanceRepository.deleteSlot(slotId);
+  },
+
+  getDailyCards: async (dayOfWeek: string, attendanceDate: string) => {
+    return teacherAttendanceRepository.getDailyCards(dayOfWeek, attendanceDate);
+  },
+
+  /**
+   * Records the arrival of a teacher. Lateness is computed against the
+   * school time zone and only when the attendance is recorded for today.
+   */
+  checkAttendance: async (dto: CheckAttendanceDto, recordedBy: string) => {
+    const slot = await assertSlotExists(dto.slotId);
+
+    const schoolClock = getSchoolClock();
+    const isToday = dto.attendanceDate === schoolClock.date;
+    const currentMinutes =
+      schoolClock.hours * MINUTES_PER_HOUR + schoolClock.minutes;
+    const lateMinutes = isToday
+      ? Math.max(0, currentMinutes - toMinutes(slot.startTime))
+      : 0;
+    const status: AttendanceStatus = lateMinutes > 0 ? "LATE" : "PRESENT";
+
+    return teacherAttendanceRepository.upsertAttendance({
+      slotId: dto.slotId,
+      attendanceDate: dto.attendanceDate,
       status,
-      now,
+      checkInTime: new Date(),
       lateMinutes,
       recordedBy,
-    );
+    });
   },
 
-  updateMotif: async (
-    slotId: string,
-    attendanceDate: string,
-    motif: string,
-    userRole: string,
-  ): Promise<any> => {
-    if (userRole !== "ADMIN") {
-      throw new AppError(
-        "Only administrators can update or add absence motifs",
-        403,
-      );
-    }
+  markAbsence: async (dto: MarkAbsenceDto, recordedBy: string) => {
+    await assertSlotExists(dto.slotId);
 
+    return teacherAttendanceRepository.upsertAttendance({
+      slotId: dto.slotId,
+      attendanceDate: dto.attendanceDate,
+      status: "ABSENT",
+      checkInTime: null,
+      lateMinutes: 0,
+      recordedBy,
+      motif: dto.motif,
+    });
+  },
+
+  updateMotif: async (slotId: string, dto: UpdateAttendanceMotifDto) => {
     const updated = await teacherAttendanceRepository.updateMotif(
       slotId,
-      attendanceDate,
-      motif,
+      dto.attendanceDate,
+      dto.motif,
     );
     if (!updated) {
       throw new AppError("Attendance record not found for this date", 404);
     }
-
     return updated;
   },
 
-  getSummaryCards: async (teacherId?: string): Promise<any[]> => {
-    return await teacherAttendanceRepository.getSummaryCards(teacherId);
+  getSummaryCards: async (teacherId?: string) => {
+    return teacherAttendanceRepository.getSummaryCards(teacherId);
   },
 };

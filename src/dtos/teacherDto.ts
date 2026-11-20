@@ -10,7 +10,6 @@ export const createTeacherSchema = z.object({
     contactNumber: z.string().optional(),
     email: z.string().email().trim().toLowerCase().optional(),
     profilePictureUrl: z.string().url().optional(),
-    subjectIds: z.array(z.string()).optional(),
     homeroomClass: z.enum(classGroupEnum).optional(),
   }),
 });
@@ -26,7 +25,7 @@ export const updateTeacherSchema = z.object({
     contactNumber: z.string().optional(),
     email: z.string().email().trim().toLowerCase().optional(),
     profilePictureUrl: z.string().optional(),
-    gender: z.enum(["MALE", "FEMALE"]).optional(),
+    gender: z.enum(genderEnum).optional(),
     homeroomClass: z.enum(classGroupEnum).optional(),
   }),
 });

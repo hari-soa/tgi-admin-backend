@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { classGroupEnum } from "./studentDto";
 
 export const resultStatusEnum = ["DRAFT", "APPROVED", "PUBLISHED"] as const;
 export const academicDecisionEnum = [
@@ -30,7 +31,7 @@ export const subjectGradeBreakdownSchema = z.object({
 export const createAnnualResultSchema = z.object({
   body: z.object({
     studentId: z.string({ message: "Student ID is required" }),
-    classGroup: z.string({ message: "Class group is required" }),
+    classGroup: z.enum(classGroupEnum, { message: "Invalid class group" }),
     academicYear: z
       .string({ message: "Academic year is required" })
       .regex(/^\d{4}-\d{4}$/, "Academic year must follow YYYY-YYYY format"),
@@ -46,7 +47,6 @@ export const createAnnualResultSchema = z.object({
       .min(0, "Average cannot be negative"),
     decision: z.enum(academicDecisionEnum).default("PENDING"),
     classRank: z.number().int().positive().optional(),
-    pdfExportUrl: z.string().url({ message: "Invalid URL format" }).optional(),
   }),
 });
 
@@ -61,7 +61,6 @@ export const updateAnnualResultSchema = z.object({
     overallAverage: z.number().min(0).optional(),
     decision: z.enum(academicDecisionEnum).optional(),
     classRank: z.number().int().positive().optional(),
-    pdfExportUrl: z.string().url().optional(),
   }),
 });
 

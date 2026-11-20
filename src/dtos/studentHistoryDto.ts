@@ -9,18 +9,23 @@ export const studentHistoryTypeEnum = [
 ] as const;
 
 export const createStudentHistoryRecordSchema = z.object({
-  body: z.object({
-    studentId: z.string({ message: "Student ID is required" }),
-    type: z.enum(studentHistoryTypeEnum, {
-      message: "Invalid student history type",
+  body: z
+    .object({
+      studentId: z.string({ message: "Student ID is required" }),
+      type: z.enum(studentHistoryTypeEnum, {
+        message: "Invalid student history type",
+      }),
+      startDate: z.coerce.date({ message: "Invalid or missing start date" }),
+      endDate: z.coerce.date({ message: "Invalid or missing end date" }),
+      reason: z
+        .string({ message: "Reason is required" })
+        .min(3, "Reason must be at least 3 characters long")
+        .trim(),
+    })
+    .refine((record) => record.endDate >= record.startDate, {
+      message: "End date cannot be before start date",
+      path: ["endDate"],
     }),
-    startDate: z.coerce.date({ message: "Invalid or missing start date" }),
-    endDate: z.coerce.date({ message: "Invalid or missing end date" }),
-    reason: z
-      .string({ message: "Reason is required" })
-      .min(3, "Reason must be at least 3 characters long")
-      .trim(),
-  }),
 });
 
 export const updateStudentHistoryRecordSchema = z.object({

@@ -1,21 +1,42 @@
 import { disciplinaryRepository } from "../repositories/disciplinaryRepository";
 import { userRepository } from "../repositories/userRepository";
+import {
+  CreateStudentHistoryRecordDto,
+  UpdateStudentHistoryRecordDto,
+} from "../dtos/studentHistoryDto";
+import {
+  CreateStudentRemarkDto,
+  UpdateStudentRemarkDto,
+} from "../dtos/studentRemarkDto";
+import { TokenPayload } from "../utils/jwt";
 import { AppError } from "../utils/AppError";
+import { assertCanAccessStudentData } from "../utils/accessControl";
+
+const assertStudentExists = async (studentId: string): Promise<void> => {
+  const student = await userRepository.findById(studentId);
+  if (!student || student.role !== "STUDENT") {
+    throw new AppError("Student not found", 404);
+  }
+};
 
 export const disciplinaryService = {
-  addHistoryRecord: async (dto: any, adminId: string) => {
-    const student = await userRepository.findById(dto.studentId);
-    if (!student || student.role !== "STUDENT") {
-      throw new AppError("Student not found", 404);
-    }
-
-    return disciplinaryRepository.createHistoryRecord({
-      ...dto,
-      adminId,
-    });
+  addHistoryRecord: async (
+    dto: CreateStudentHistoryRecordDto,
+    adminId: string,
+  ) => {
+    await assertStudentExists(dto.studentId);
+    return disciplinaryRepository.createHistoryRecord(dto, adminId);
   },
 
-  updateHistoryRecord: async (id: string, dto: any) => {
+  getStudentHistory: async (studentId: string, requester: TokenPayload) => {
+    assertCanAccessStudentData(requester, studentId);
+    return disciplinaryRepository.findHistoryByStudentId(studentId);
+  },
+
+  updateHistoryRecord: async (
+    id: string,
+    dto: UpdateStudentHistoryRecordDto,
+  ) => {
     const updated = await disciplinaryRepository.updateHistoryRecord(id, dto);
     if (!updated) {
       throw new AppError(
@@ -27,23 +48,27 @@ export const disciplinaryService = {
   },
 
   deleteHistoryRecord: async (id: string) => {
-    await disciplinaryRepository.deleteHistoryRecord(id);
-  },
-
-  addRemark: async (dto: any, authorId: string, authorRole: string) => {
-    const student = await userRepository.findById(dto.studentId);
-    if (!student || student.role !== "STUDENT") {
-      throw new AppError("Student not found", 404);
+    const deleted = await disciplinaryRepository.deleteHistoryRecord(id);
+    if (!deleted) {
+      throw new AppError("History record not found", 404);
     }
-
-    return disciplinaryRepository.createRemark({
-      ...dto,
-      authorId,
-      authorRole,
-    });
   },
 
-  updateRemark: async (id: string, dto: any) => {
+  addRemark: async (
+    dto: CreateStudentRemarkDto,
+    authorId: string,
+    authorRole: string,
+  ) => {
+    await assertStudentExists(dto.studentId);
+    return disciplinaryRepository.createRemark(dto, authorId, authorRole);
+  },
+
+  getStudentRemarks: async (studentId: string, requester: TokenPayload) => {
+    assertCanAccessStudentData(requester, studentId);
+    return disciplinaryRepository.findRemarksByStudentId(studentId);
+  },
+
+  updateRemark: async (id: string, dto: UpdateStudentRemarkDto) => {
     const updated = await disciplinaryRepository.updateRemark(id, dto);
     if (!updated) {
       throw new AppError("Remark not found or no changes provided", 404);
@@ -52,6 +77,9 @@ export const disciplinaryService = {
   },
 
   deleteRemark: async (id: string) => {
-    await disciplinaryRepository.deleteRemark(id);
+    const deleted = await disciplinaryRepository.deleteRemark(id);
+    if (!deleted) {
+      throw new AppError("Remark not found", 404);
+    }
   },
 };

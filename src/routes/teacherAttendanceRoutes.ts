@@ -5,11 +5,14 @@ import { validate } from "../middlewares/validateMiddlewares";
 import {
   createAttendanceSlotSchema,
   checkAttendanceSchema,
+  markAbsenceSchema,
+  dailyAttendanceQuerySchema,
+  attendanceSummaryQuerySchema,
   updateAttendanceMotifSchema,
   updateAttendanceSlotSchema,
 } from "../dtos/teacherAttendanceDto";
 
-export const router = Router();
+const router = Router();
 
 router.post(
   "/slots",
@@ -23,6 +26,7 @@ router.get(
   "/daily",
   authenticate,
   authorize("ADMIN"),
+  validate(dailyAttendanceQuerySchema),
   teacherAttendanceController.getDailyCards,
 );
 
@@ -32,6 +36,14 @@ router.post(
   authorize("ADMIN"),
   validate(checkAttendanceSchema),
   teacherAttendanceController.checkAttendance,
+);
+
+router.post(
+  "/absence",
+  authenticate,
+  authorize("ADMIN"),
+  validate(markAbsenceSchema),
+  teacherAttendanceController.markAbsence,
 );
 
 router.patch(
@@ -46,6 +58,7 @@ router.get(
   "/summaries",
   authenticate,
   authorize("ADMIN"),
+  validate(attendanceSummaryQuerySchema),
   teacherAttendanceController.getSummaryCards,
 );
 

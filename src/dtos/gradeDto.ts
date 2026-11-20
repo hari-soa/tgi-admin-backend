@@ -9,41 +9,55 @@ export const termEnum = [
 ] as const;
 export const gradeStatusEnum = ["DRAFT", "PENDING", "PUBLISHED"] as const;
 
-export const createGradeSchema = z.object({
-  body: z.object({
+const valueIsWithinMaxScore = (grade: {
+  value?: number;
+  maxScore?: number;
+}): boolean =>
+  grade.value === undefined ||
+  grade.maxScore === undefined ||
+  grade.value <= grade.maxScore;
+
+const VALUE_ABOVE_MAX_MESSAGE = {
+  message: "Grade value cannot exceed the max score",
+  path: ["value"],
+};
+
+const sessionGradeSchema = z
+  .object({
     studentId: z.string({ message: "Student ID is required" }),
-    subjectId: z.string({ message: "Subject ID is required" }),
-    classGroup: z.enum(classGroupEnum, { message: "Invalid class group" }),
-    examType: z.enum(examTypeEnum, { message: "Invalid exam type" }),
-    term: z.enum(termEnum, { message: "Invalid term" }),
-    value: z
-      .number({ message: "Grade value must be a number" })
-      .min(0, "Grade value cannot be negative"),
-    maxScore: z
-      .number({ message: "Max score is required" })
-      .positive("Max score must be greater than 0")
-      .default(20),
-    evaluationDate: z.coerce.date({
-      message: "Invalid or missing evaluation date",
-    }),
-  }),
+    value: z.number({ message: "Grade value must be a number" }).min(0),
+    maxScore: z.number().positive().default(20),
+  })
+  .refine(valueIsWithinMaxScore, VALUE_ABOVE_MAX_MESSAGE);
+
+export const createGradeSchema = z.object({
+  body: z
+    .object({
+      studentId: z.string({ message: "Student ID is required" }),
+      subjectId: z.string({ message: "Subject ID is required" }),
+      classGroup: z.enum(classGroupEnum, { message: "Invalid class group" }),
+      examType: z.enum(examTypeEnum, { message: "Invalid exam type" }),
+      term: z.enum(termEnum, { message: "Invalid term" }),
+      value: z
+        .number({ message: "Grade value must be a number" })
+        .min(0, "Grade value cannot be negative"),
+      maxScore: z
+        .number()
+        .positive("Max score must be greater than 0")
+        .default(20),
+      evaluationDate: z.coerce.date({
+        message: "Invalid or missing evaluation date",
+      }),
+    })
+    .refine(valueIsWithinMaxScore, VALUE_ABOVE_MAX_MESSAGE),
 });
 
-export const submitGradeSessionSchema = z.object({
+export const updateGradeSchema = z.object({
+  params: z.object({ id: z.string() }),
   body: z.object({
-    classGroup: z.enum(classGroupEnum, { message: "Invalid class group" }),
-    subjectId: z.string({ message: "Subject ID is required" }),
-    examType: z.enum(examTypeEnum, { message: "Invalid exam type" }),
-    term: z.enum(termEnum, { message: "Invalid term" }),
-    grades: z
-      .array(
-        z.object({
-          studentId: z.string({ message: "Student ID is required" }),
-          value: z.number().min(0),
-          maxScore: z.number().positive().default(20),
-        }),
-      )
-      .min(1, "At least one grade is required"),
+    value: z.number().min(0).optional(),
+    maxScore: z.number().positive().optional(),
+    evaluationDate: z.coerce.date().optional(),
   }),
 });
 
@@ -56,8 +70,32 @@ export const reviewGradeSchema = z.object({
   }),
 });
 
+export const createGradeSessionSchema = z.object({
+  body: z.object({
+    classGroup: z.enum(classGroupEnum, { message: "Invalid class group" }),
+    subjectId: z.string({ message: "Subject ID is required" }),
+    examType: z.enum(examTypeEnum, { message: "Invalid exam type" }),
+    term: z.enum(termEnum, { message: "Invalid term" }),
+  }),
+});
+
+export const saveGradeSessionDraftSchema = z.object({
+  params: z.object({ id: z.string() }),
+  body: z.object({ grades: z.array(sessionGradeSchema) }),
+});
+
+export const submitGradeSessionSchema = z.object({
+  params: z.object({ id: z.string() }),
+  body: z.object({
+    grades: z
+      .array(sessionGradeSchema)
+      .min(1, "At least one grade is required"),
+  }),
+});
+
 export type CreateGradeDto = z.infer<typeof createGradeSchema>["body"];
-export type SubmitGradeSessionDto = z.infer<
-  typeof submitGradeSessionSchema
+export type UpdateGradeDto = z.infer<typeof updateGradeSchema>["body"];
+export type CreateGradeSessionDto = z.infer<
+  typeof createGradeSessionSchema
 >["body"];
-export type ReviewGradeDto = z.infer<typeof reviewGradeSchema>["body"];
+export type SessionGradeDto = z.infer<typeof sessionGradeSchema>;

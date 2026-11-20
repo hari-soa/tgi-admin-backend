@@ -58,6 +58,7 @@ CREATE TABLE students (
     parents_contact_number VARCHAR(30) NOT NULL,
     entry_year INT NOT NULL,
     graduation_year INT,
+    comments TEXT,
     is_active BOOLEAN DEFAULT TRUE
 );
 
@@ -70,9 +71,6 @@ CREATE TABLE subjects (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-
-CREATE UNIQUE INDEX unique_active_subject_per_class 
-ON subject_target_classes (subject_id, target_class); 
 
 CREATE TABLE subject_target_classes (
     subject_id UUID REFERENCES subjects(id) ON DELETE CASCADE,
@@ -141,6 +139,26 @@ CREATE INDEX idx_teacher_attendance_slots_teacher ON teacher_attendance_slots(te
 CREATE INDEX idx_teacher_attendance_slots_day ON teacher_attendance_slots(day_of_week);
 CREATE INDEX idx_teacher_attendances_date ON teacher_attendances(attendance_date);
 
+CREATE TABLE grade_sessions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    class_group class_group_enum NOT NULL,
+    subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+    exam_type exam_type_enum NOT NULL,
+    term term_enum NOT NULL,
+    academic_year VARCHAR(20) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'PENDING_REVIEW', 'VALIDATED')),
+    draft_grades JSONB NOT NULL DEFAULT '[]',
+    created_by_admin_id UUID NOT NULL REFERENCES administrators(user_id),
+    submitted_by_secretary_id UUID REFERENCES secretaries(user_id),
+    validated_by_admin_id UUID REFERENCES administrators(user_id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    submitted_at TIMESTAMP WITH TIME ZONE,
+    validated_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE UNIQUE INDEX unique_grade_session
+ON grade_sessions (class_group, subject_id, exam_type, term, academic_year);
+
 CREATE TABLE grades (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     student_id UUID NOT NULL REFERENCES students(user_id) ON DELETE CASCADE,
@@ -152,13 +170,12 @@ CREATE TABLE grades (
     value NUMERIC(4, 2) NOT NULL,
     max_score NUMERIC(4, 2) NOT NULL DEFAULT 20.00,
     evaluation_date DATE NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'PENDING', 'PUBLISHED')),
+    approved_by_admin_id UUID REFERENCES administrators(user_id),
+    session_id UUID REFERENCES grade_sessions(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-
-ALTER TABLE grades 
-ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'DRAFT',
-ADD COLUMN IF NOT EXISTS approved_by_admin_id UUID REFERENCES administrators(user_id);
 
 CREATE TABLE annual_results (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -176,6 +193,9 @@ CREATE TABLE annual_results (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE UNIQUE INDEX unique_annual_result_per_student_year
+ON annual_results (student_id, academic_year);
 
 CREATE TABLE annual_result_subject_breakdowns (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

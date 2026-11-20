@@ -1,53 +1,84 @@
 import { z } from "zod";
 
-const dayOfWeekEnum = z.enum([
+export const dayOfWeekEnum = [
   "MONDAY",
   "TUESDAY",
   "WEDNESDAY",
   "THURSDAY",
   "FRIDAY",
   "SATURDAY",
-]);
+] as const;
 
-const attendanceStatusEnum = z.enum(["PRESENT", "LATE", "ABSENT"]);
+const TIME_FORMAT_REGEX = /^([01]\d|2[0-3]):([0-5]\d)(:[0-5]\d)?$/;
+const DATE_FORMAT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
-const timeFormatRegex = /^([01]\d|2[0-3]):([0-5]\d)(:[0-5]\d)?$/;
-
-export const createAttendanceSlotSchema = z.object({
+const attendanceSlotFields = {
   teacherId: z.string().uuid(),
   subjectId: z.string().uuid(),
-  targetClass: z.string().min(1),
-  dayOfWeek: dayOfWeekEnum,
-  startTime: z.string().regex(timeFormatRegex),
-  endTime: z.string().regex(timeFormatRegex),
-  classroom: z.string().min(1),
+  targetClass: z.enum(["SECONDE", "PREMIERE", "TERMINALE", "ANCIEN"]),
+  dayOfWeek: z.enum(dayOfWeekEnum),
+  startTime: z.string().regex(TIME_FORMAT_REGEX, "Invalid time format"),
+  endTime: z.string().regex(TIME_FORMAT_REGEX, "Invalid time format"),
+  classroom: z.string().min(1, "Classroom is required").trim(),
+};
+
+export const createAttendanceSlotSchema = z.object({
+  body: z.object(attendanceSlotFields),
 });
 
-export const updateAttendanceSlotSchema = createAttendanceSlotSchema.partial();
+export const updateAttendanceSlotSchema = z.object({
+  params: z.object({ slotId: z.string().uuid() }),
+  body: z.object(attendanceSlotFields).partial(),
+});
+
+export const dailyAttendanceQuerySchema = z.object({
+  query: z.object({
+    day: z.enum(dayOfWeekEnum),
+    date: z.string().regex(DATE_FORMAT_REGEX, "Date must be YYYY-MM-DD"),
+  }),
+});
+
+export const attendanceSummaryQuerySchema = z.object({
+  query: z.object({ teacherId: z.string().uuid().optional() }),
+});
 
 export const checkAttendanceSchema = z.object({
-  slotId: z.string().uuid(),
-  attendanceDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  body: z.object({
+    slotId: z.string().uuid(),
+    attendanceDate: z
+      .string()
+      .regex(DATE_FORMAT_REGEX, "Date must be YYYY-MM-DD"),
+  }),
 });
 
-export const updateAttendanceSchema = z.object({
-  status: attendanceStatusEnum.optional(),
-  lateDurationMinutes: z.number().int().min(0).optional(),
-  motif: z.string().optional(),
+export const markAbsenceSchema = z.object({
+  body: z.object({
+    slotId: z.string().uuid(),
+    attendanceDate: z
+      .string()
+      .regex(DATE_FORMAT_REGEX, "Date must be YYYY-MM-DD"),
+    motif: z.string().trim().min(1).optional(),
+  }),
 });
 
 export const updateAttendanceMotifSchema = z.object({
-  motif: z.string().min(1),
+  params: z.object({ slotId: z.string().uuid() }),
+  body: z.object({
+    attendanceDate: z
+      .string()
+      .regex(DATE_FORMAT_REGEX, "Date must be YYYY-MM-DD"),
+    motif: z.string().trim().min(1, "Motif is required"),
+  }),
 });
 
 export type CreateAttendanceSlotDto = z.infer<
   typeof createAttendanceSlotSchema
->;
+>["body"];
 export type UpdateAttendanceSlotDto = z.infer<
   typeof updateAttendanceSlotSchema
->;
-export type CheckAttendanceDto = z.infer<typeof checkAttendanceSchema>;
-export type UpdateAttendanceDto = z.infer<typeof updateAttendanceSchema>;
+>["body"];
+export type CheckAttendanceDto = z.infer<typeof checkAttendanceSchema>["body"];
+export type MarkAbsenceDto = z.infer<typeof markAbsenceSchema>["body"];
 export type UpdateAttendanceMotifDto = z.infer<
   typeof updateAttendanceMotifSchema
->;
+>["body"];
