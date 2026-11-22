@@ -1,20 +1,34 @@
 import { subjectRepository } from "../repositories/subjectRepository";
 import { userRepository } from "../repositories/userRepository";
-import { CreateSubjectDto, UpdateSubjectDto } from "../dtos/subjectDto";
+import {
+  ClassAssignmentDto,
+  CreateSubjectDto,
+  UpdateSubjectDto,
+} from "../dtos/subjectDto";
 import { AppError } from "../utils/AppError";
+
+const assertAssignmentsTargetTeachers = async (
+  assignments: ClassAssignmentDto[],
+): Promise<void> => {
+  const teachers = await Promise.all(
+    assignments.map(({ teacherId }) => userRepository.findById(teacherId)),
+  );
+  const invalidIndex = teachers.findIndex(
+    (teacher) => !teacher || teacher.role !== "TEACHER",
+  );
+
+  if (invalidIndex >= 0) {
+    throw new AppError(
+      `Teacher with ID ${assignments[invalidIndex].teacherId} not found or is not a teacher`,
+      400,
+    );
+  }
+};
 
 export const subjectService = {
   createSubject: async (dto: CreateSubjectDto) => {
-    for (const assignment of dto.assignments) {
-      const teacher = await userRepository.findById(assignment.teacherId);
-      if (!teacher || (teacher.role || "").toUpperCase() !== "TEACHER") {
-        throw new AppError(
-          `Teacher with ID ${assignment.teacherId} not found or is not a teacher`,
-          400,
-        );
-      }
-    }
-    return subjectRepository.create(dto);
+    await assertAssignmentsTargetTeachers(dto.assignments);
+    return subjectRepository.create({ ...dto, name: dto.name.trim() });
   },
 
   updateSubject: async (id: string, dto: UpdateSubjectDto) => {
@@ -24,18 +38,13 @@ export const subjectService = {
     }
 
     if (dto.assignments) {
-      for (const assignment of dto.assignments) {
-        const teacher = await userRepository.findById(assignment.teacherId);
-        if (!teacher || (teacher.role || "").toUpperCase() !== "TEACHER") {
-          throw new AppError(
-            `Teacher with ID ${assignment.teacherId} not found or is not a teacher`,
-            400,
-          );
-        }
-      }
+      await assertAssignmentsTargetTeachers(dto.assignments);
     }
 
-    return subjectRepository.update(id, dto);
+    return subjectRepository.update(id, {
+      ...dto,
+      ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+    });
   },
 
   getAllSubjects: async () => {

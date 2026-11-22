@@ -19,12 +19,19 @@ const assertStudentExists = async (studentId: string): Promise<void> => {
   }
 };
 
+const assertPeriodIsValid = (startDate?: string, endDate?: string): void => {
+  if (startDate && endDate && new Date(endDate) < new Date(startDate)) {
+    throw new AppError("End date cannot be before start date", 400);
+  }
+};
+
 export const disciplinaryService = {
   addHistoryRecord: async (
     dto: CreateStudentHistoryRecordDto,
     adminId: string,
   ) => {
     await assertStudentExists(dto.studentId);
+    assertPeriodIsValid(dto.startDate, dto.endDate);
     return disciplinaryRepository.createHistoryRecord(dto, adminId);
   },
 
@@ -37,6 +44,7 @@ export const disciplinaryService = {
     id: string,
     dto: UpdateStudentHistoryRecordDto,
   ) => {
+    assertPeriodIsValid(dto.startDate, dto.endDate);
     const updated = await disciplinaryRepository.updateHistoryRecord(id, dto);
     if (!updated) {
       throw new AppError(

@@ -52,10 +52,6 @@ const attachSubjects = async (
 };
 
 export const resultRepository = {
-  /**
-   * Creates the annual result of a student, or replaces it when one already
-   * exists for the same academic year (one report card per student and year).
-   */
   upsertAnnualResult: async (
     dto: AnnualResultInput,
     secretaryId: string,
@@ -138,7 +134,7 @@ export const resultRepository = {
             subject.term2TrimesterGrade ?? null,
             subject.term3SemiTrimesterGrade ?? null,
             subject.term3TrimesterGrade ?? null,
-            subject.subjectOverallAverage,
+            subject.subjectOverallAverage ?? null,
           ]),
         ),
       );
@@ -163,7 +159,7 @@ export const resultRepository = {
        FROM (
          SELECT id, RANK() OVER (ORDER BY overall_average DESC) AS position
          FROM annual_results
-         WHERE class_group = $1 AND academic_year = $2
+         WHERE class_group = $1 AND academic_year = $2 AND overall_average IS NOT NULL
        ) AS ranked
        WHERE target.id = ranked.id;`,
       [classGroup, academicYear],

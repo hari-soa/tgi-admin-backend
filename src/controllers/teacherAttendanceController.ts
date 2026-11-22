@@ -15,7 +15,7 @@ type DailyQuery = { day: string; date: string };
 type SummaryQuery = { teacherId?: string };
 
 export const teacherAttendanceController = {
-  createSlot: catchAsync(
+  createAttendanceSlot: catchAsync(
     async (
       req: Request<unknown, unknown, CreateAttendanceSlotDto>,
       res: Response,
@@ -29,7 +29,7 @@ export const teacherAttendanceController = {
     },
   ),
 
-  updateSlot: catchAsync(
+  updateAttendanceSlot: catchAsync(
     async (
       req: Request<SlotParams, unknown, UpdateAttendanceSlotDto>,
       res: Response,
@@ -46,16 +46,15 @@ export const teacherAttendanceController = {
     },
   ),
 
-  deleteSlot: catchAsync(
+  deleteAttendanceSlot: catchAsync(
     async (req: Request<SlotParams>, res: Response): Promise<void> => {
       await teacherAttendanceService.deleteSlot(req.params.slotId);
       res.status(204).send();
     },
   ),
 
-  getDailyCards: catchAsync(
+  getDailyAttendance: catchAsync(
     async (req: Request, res: Response): Promise<void> => {
-      // day and date are guaranteed by dailyAttendanceQuerySchema
       const { day, date } = req.query as DailyQuery;
       const cards = await teacherAttendanceService.getDailyCards(day, date);
       res.status(200).json({
@@ -83,7 +82,7 @@ export const teacherAttendanceController = {
     },
   ),
 
-  markAbsence: catchAsync(
+  markAttendanceAbsence: catchAsync(
     async (
       req: AuthenticatedRequest<unknown, MarkAbsenceDto>,
       res: Response,
@@ -100,7 +99,7 @@ export const teacherAttendanceController = {
     },
   ),
 
-  updateMotif: catchAsync(
+  updateAttendanceMotif: catchAsync(
     async (
       req: Request<SlotParams, unknown, UpdateAttendanceMotifDto>,
       res: Response,
@@ -117,7 +116,7 @@ export const teacherAttendanceController = {
     },
   ),
 
-  getSummaryCards: catchAsync(
+  getAttendanceSummaries: catchAsync(
     async (
       req: Request<unknown, unknown, unknown, SummaryQuery>,
       res: Response,

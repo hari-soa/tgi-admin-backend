@@ -3,11 +3,13 @@ import { userRepository } from "../repositories/userRepository";
 import { subjectRepository } from "../repositories/subjectRepository";
 import { resultService } from "./resultService";
 import {
+  AbsenceMotifDto,
   CreateGradeDto,
   CreateGradeSessionDto,
   SessionGradeDto,
   UpdateGradeDto,
 } from "../dtos/gradeDto";
+import { SessionSubmission } from "../repositories/gradeRepository";
 import { GradeSession, GradeSessionStatus } from "../models/gradeModel";
 import { AppError } from "../utils/AppError";
 import { getAcademicYear } from "../utils/academicYear";
@@ -30,17 +32,10 @@ const getSessionOrThrow = async (id: string): Promise<GradeSession> => {
   return session;
 };
 
-/**
- * Every grade of a session must belong to an active student of the
- * session's class, and a student can appear only once.
- */
-const assertEntriesMatchClass = async (
-  session: GradeSession,
+const assertEntriesMatchClass = (
+  classStudentIds: string[],
   entries: SessionGradeDto[],
-): Promise<void> => {
-  const classStudentIds = await userRepository.findActiveStudentIdsByClassGroup(
-    session.classGroup,
-  );
+): void => {
   const hasForeignStudent = entries.some(
     (entry) => !classStudentIds.includes(entry.studentId),
   );
@@ -56,6 +51,48 @@ const assertEntriesMatchClass = async (
   if (uniqueStudentCount !== entries.length) {
     throw new AppError("A student cannot have two grades in one session", 400);
   }
+};
+
+const hasGradeValue = (entry: SessionGradeDto): boolean =>
+  entry.value !== null && entry.value !== undefined;
+
+const getClassStudentIds = (session: GradeSession): Promise<string[]> =>
+  userRepository.findActiveStudentIdsByClassGroup(session.classGroup);
+
+const buildSubmission = async (
+  session: GradeSession,
+  entries: SessionGradeDto[],
+  motifs: AbsenceMotifDto[] = [],
+): Promise<SessionSubmission> => {
+  const classStudentIds = await getClassStudentIds(session);
+  assertEntriesMatchClass(classStudentIds, entries);
+
+  if (!entries.some(hasGradeValue)) {
+    throw new AppError("At least one grade is required", 400);
+  }
+
+  const gradeByStudent = new Map(
+    entries.map((entry) => [entry.studentId, entry.value ?? null]),
+  );
+  const normalizedEntries = classStudentIds.map((studentId) => ({
+    studentId,
+    value: gradeByStudent.get(studentId) ?? null,
+  }));
+  const absentStudentIds = normalizedEntries
+    .filter((entry) => entry.value === null)
+    .map((entry) => entry.studentId);
+  const absenceMotifs = motifs.filter((motif) =>
+    absentStudentIds.includes(motif.studentId),
+  );
+
+  return {
+    entries: normalizedEntries,
+    absentStudentIds,
+    motifs: absenceMotifs.map((motif) => ({
+      studentId: motif.studentId,
+      motif: motif.motif.trim(),
+    })),
+  };
 };
 
 export const gradeService = {
@@ -126,9 +163,15 @@ export const gradeService = {
 
   saveSessionDraft: async (id: string, entries: SessionGradeDto[]) => {
     const session = await getSessionOrThrow(id);
-    await assertEntriesMatchClass(session, entries);
+    assertEntriesMatchClass(await getClassStudentIds(session), entries);
 
-    const saved = await gradeRepository.saveSessionDraft(id, entries);
+    const saved = await gradeRepository.saveSessionDraft(
+      id,
+      entries.map((entry) => ({
+        studentId: entry.studentId,
+        value: entry.value ?? null,
+      })),
+    );
     if (!saved) {
       throw new AppError("Only an open session can be edited", 409);
     }
@@ -141,11 +184,11 @@ export const gradeService = {
     secretaryId: string,
   ) => {
     const session = await getSessionOrThrow(id);
-    await assertEntriesMatchClass(session, entries);
+    const submission = await buildSubmission(session, entries);
 
     const submitted = await gradeRepository.submitSession(
       id,
-      entries,
+      submission,
       secretaryId,
     );
     if (!submitted) {
@@ -154,10 +197,24 @@ export const gradeService = {
     return getSessionOrThrow(id);
   },
 
-  /**
-   * Publishes the grades of a session, then refreshes the annual report of
-   * every student concerned so that the grades appear in their report card.
-   */
+  reviseSession: async (
+    id: string,
+    entries: SessionGradeDto[],
+    motifs: AbsenceMotifDto[] = [],
+  ) => {
+    const session = await getSessionOrThrow(id);
+    const submission = await buildSubmission(session, entries, motifs);
+
+    const revised = await gradeRepository.reviseSession(id, submission);
+    if (!revised) {
+      throw new AppError(
+        "Only a session pending review can be corrected",
+        409,
+      );
+    }
+    return getSessionOrThrow(id);
+  },
+
   validateSession: async (id: string, adminId: string) => {
     await getSessionOrThrow(id);
 

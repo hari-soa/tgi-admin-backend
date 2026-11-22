@@ -11,7 +11,6 @@ export interface TeacherAttendanceSlot {
   dayOfWeek: DayOfWeek;
   startTime: string;
   endTime: string;
-  classroom: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -38,7 +37,6 @@ export interface AttendanceCardView {
   subjectId: string;
   subjectName: string;
   targetClass: string;
-  classroom: string;
   startTime: string;
   endTime: string;
   attendanceDate: string;

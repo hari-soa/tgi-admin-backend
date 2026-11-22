@@ -5,15 +5,16 @@ import { catchAsync } from "../utils/catchAsync";
 import {
   CreateGradeDto,
   CreateGradeSessionDto,
-  SessionGradeDto,
+  ReviewGradeDto,
+  ReviseGradeSessionDto,
+  SaveGradeSessionDto,
   UpdateGradeDto,
 } from "../dtos/gradeDto";
 
 type IdParams = { id: string };
-type SessionGradesBody = { grades: SessionGradeDto[] };
 
 export const gradeController = {
-  create: catchAsync(
+  createGrade: catchAsync(
     async (
       req: AuthenticatedRequest<unknown, CreateGradeDto>,
       res: Response,
@@ -27,7 +28,7 @@ export const gradeController = {
     },
   ),
 
-  getAll: catchAsync(async (_req: Request, res: Response): Promise<void> => {
+  listGrades: catchAsync(async (_req: Request, res: Response): Promise<void> => {
     const grades = await gradeService.getAllGrades();
     res.status(200).json({
       status: "success",
@@ -36,14 +37,14 @@ export const gradeController = {
     });
   }),
 
-  getById: catchAsync(
+  getGradeById: catchAsync(
     async (req: Request<IdParams>, res: Response): Promise<void> => {
       const grade = await gradeService.getGradeById(req.params.id);
       res.status(200).json({ status: "success", data: { grade } });
     },
   ),
 
-  update: catchAsync(
+  updateGrade: catchAsync(
     async (
       req: Request<IdParams, unknown, UpdateGradeDto>,
       res: Response,
@@ -57,9 +58,9 @@ export const gradeController = {
     },
   ),
 
-  review: catchAsync(
+  reviewGrade: catchAsync(
     async (
-      req: AuthenticatedRequest<IdParams, { status: string }>,
+      req: AuthenticatedRequest<IdParams, ReviewGradeDto>,
       res: Response,
     ): Promise<void> => {
       const grade = await gradeService.reviewGrade(
@@ -75,14 +76,14 @@ export const gradeController = {
     },
   ),
 
-  delete: catchAsync(
+  deleteGrade: catchAsync(
     async (req: Request<IdParams>, res: Response): Promise<void> => {
       await gradeService.deleteGrade(req.params.id);
       res.status(204).send();
     },
   ),
 
-  createSession: catchAsync(
+  createGradeSession: catchAsync(
     async (
       req: AuthenticatedRequest<unknown, CreateGradeSessionDto>,
       res: Response,
@@ -99,7 +100,7 @@ export const gradeController = {
     },
   ),
 
-  getSessions: catchAsync(
+  listGradeSessions: catchAsync(
     async (req: AuthenticatedRequest, res: Response): Promise<void> => {
       const sessions = await gradeService.getSessions(req.user!.role);
       res.status(200).json({
@@ -110,9 +111,9 @@ export const gradeController = {
     },
   ),
 
-  saveSessionDraft: catchAsync(
+  saveGradeSessionDraft: catchAsync(
     async (
-      req: Request<IdParams, unknown, SessionGradesBody>,
+      req: Request<IdParams, unknown, SaveGradeSessionDto>,
       res: Response,
     ): Promise<void> => {
       const session = await gradeService.saveSessionDraft(
@@ -127,9 +128,9 @@ export const gradeController = {
     },
   ),
 
-  submitSession: catchAsync(
+  submitGradeSession: catchAsync(
     async (
-      req: AuthenticatedRequest<IdParams, SessionGradesBody>,
+      req: AuthenticatedRequest<IdParams, SaveGradeSessionDto>,
       res: Response,
     ): Promise<void> => {
       const session = await gradeService.submitSession(
@@ -145,7 +146,7 @@ export const gradeController = {
     },
   ),
 
-  validateSession: catchAsync(
+  validateGradeSession: catchAsync(
     async (
       req: AuthenticatedRequest<IdParams>,
       res: Response,
@@ -157,6 +158,24 @@ export const gradeController = {
       res.status(200).json({
         status: "success",
         message: "Grade session validated and published to the report cards",
+        data: { session },
+      });
+    },
+  ),
+
+  reviseGradeSession: catchAsync(
+    async (
+      req: AuthenticatedRequest<IdParams, ReviseGradeSessionDto>,
+      res: Response,
+    ): Promise<void> => {
+      const session = await gradeService.reviseSession(
+        req.params.id,
+        req.body.grades,
+        req.body.absences,
+      );
+      res.status(200).json({
+        status: "success",
+        message: "Submitted grades corrected successfully",
         data: { session },
       });
     },

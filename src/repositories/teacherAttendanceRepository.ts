@@ -15,7 +15,7 @@ import { buildUpdateStatement } from "../utils/sqlUpdate";
 const SLOT_COLUMNS = `
   id, teacher_id AS "teacherId", subject_id AS "subjectId", target_class AS "targetClass",
   day_of_week AS "dayOfWeek", start_time AS "startTime", end_time AS "endTime",
-  classroom, created_at AS "createdAt", updated_at AS "updatedAt"
+  created_at AS "createdAt", updated_at AS "updatedAt"
 `;
 
 const ATTENDANCE_COLUMNS = `
@@ -31,7 +31,6 @@ const SLOT_COLUMN_MAPPING: Record<string, string> = {
   dayOfWeek: "day_of_week",
   startTime: "start_time",
   endTime: "end_time",
-  classroom: "classroom",
 };
 
 export interface UpsertAttendanceInput {
@@ -49,8 +48,8 @@ export const teacherAttendanceRepository = {
     dto: CreateAttendanceSlotDto,
   ): Promise<TeacherAttendanceSlot> => {
     const { rows } = await pool.query(
-      `INSERT INTO teacher_attendance_slots (teacher_id, subject_id, target_class, day_of_week, start_time, end_time, classroom)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO teacher_attendance_slots (teacher_id, subject_id, target_class, day_of_week, start_time, end_time)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING ${SLOT_COLUMNS};`,
       [
         dto.teacherId,
@@ -59,7 +58,6 @@ export const teacherAttendanceRepository = {
         dto.dayOfWeek,
         dto.startTime,
         dto.endTime,
-        dto.classroom,
       ],
     );
     return rows[0];
@@ -92,7 +90,7 @@ export const teacherAttendanceRepository = {
               tas.teacher_id AS "teacherId",
               u.first_name AS "teacherFirstName", u.last_name AS "teacherLastName",
               tas.subject_id AS "subjectId", s.name AS "subjectName",
-              tas.target_class AS "targetClass", tas.classroom,
+              tas.target_class AS "targetClass",
               tas.day_of_week AS "dayOfWeek",
               tas.start_time AS "startTime", tas.end_time AS "endTime",
               $2::text AS "attendanceDate",

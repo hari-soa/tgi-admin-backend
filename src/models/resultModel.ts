@@ -15,13 +15,13 @@ export interface SubjectGradeBreakdown {
   subjectId: string;
   subjectName?: string;
   coefficient: number;
-  term1SemiTrimesterGrade?: number;
-  term1TrimesterGrade?: number;
-  term2SemiTrimesterGrade?: number;
-  term2TrimesterGrade?: number;
-  term3SemiTrimesterGrade?: number;
-  term3TrimesterGrade?: number;
-  subjectOverallAverage: number;
+  term1SemiTrimesterGrade?: number | null;
+  term1TrimesterGrade?: number | null;
+  term2SemiTrimesterGrade?: number | null;
+  term2TrimesterGrade?: number | null;
+  term3SemiTrimesterGrade?: number | null;
+  term3TrimesterGrade?: number | null;
+  subjectOverallAverage: number | null;
 }
 
 export type SubjectGradeField = Exclude<

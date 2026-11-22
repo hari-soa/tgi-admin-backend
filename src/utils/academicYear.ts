@@ -1,9 +1,5 @@
-const SCHOOL_YEAR_FIRST_MONTH_INDEX = 8; // September (0-based)
+const SCHOOL_YEAR_FIRST_MONTH_INDEX = 8;
 
-/**
- * Returns the academic year ("YYYY-YYYY") a date belongs to.
- * A school year starts in September.
- */
 export const getAcademicYear = (date: Date = new Date()): string => {
   const year = date.getFullYear();
   const startYear =

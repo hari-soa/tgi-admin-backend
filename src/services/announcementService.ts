@@ -26,12 +26,24 @@ const getStudentClassGroup = async (
   return (student as { classGroup?: string } | null)?.classGroup;
 };
 
+const assertClassScopeHasClasses = (
+  targetScope: string | undefined,
+  targetClasses: string[] | undefined,
+): void => {
+  if (targetScope === "CLASS" && (targetClasses ?? []).length === 0) {
+    throw new AppError(
+      "At least one target class is required when the scope is CLASS",
+      400,
+    );
+  }
+};
+
 export const announcementService = {
   createAnnouncement: async (dto: CreateAnnouncementDto, authorId: string) => {
+    assertClassScopeHasClasses(dto.targetScope, dto.targetClasses);
     return announcementRepository.create(dto, authorId);
   },
 
-  /** Students only receive the announcements addressed to them. */
   getAllAnnouncements: async (requester: TokenPayload) => {
     if (requester.role !== "STUDENT") {
       return announcementRepository.findAll();
@@ -56,6 +68,7 @@ export const announcementService = {
   },
 
   updateAnnouncement: async (id: string, dto: UpdateAnnouncementDto) => {
+    assertClassScopeHasClasses(dto.targetScope, dto.targetClasses);
     const updated = await announcementRepository.update(id, dto);
     if (!updated) {
       throw new AppError("Announcement not found", 404);

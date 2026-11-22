@@ -1,6 +1,6 @@
-import { Request, Response, NextFunction } from "express";
+import { Request } from "express";
+import { SecurityHandlers } from "express-openapi-validator/dist/framework/types";
 import { verifyToken, TokenPayload } from "../utils/jwt";
-import { AppError } from "../utils/AppError";
 
 export interface AuthenticatedRequest<
   TParams = Request["params"],
@@ -9,38 +9,42 @@ export interface AuthenticatedRequest<
   user?: TokenPayload;
 }
 
-export const authenticate = (
-  req: AuthenticatedRequest,
-  _res: Response,
-  next: NextFunction,
-): void => {
-  const authHeader = req.headers.authorization;
+type OperationMetadata = { schema?: { "x-roles"?: string[] } };
+
+const rejectWith = (message: string, status: number): Error =>
+  Object.assign(new Error(message), { status });
+
+const readBearerToken = (request: Request): string => {
+  const authHeader = request.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return next(new AppError("Authentication required. Please log in.", 401));
+    throw rejectWith("Authentication required. Please log in.", 401);
   }
+  return authHeader.split(" ")[1];
+};
 
-  const token = authHeader.split(" ")[1];
-
+const verifyBearerToken = (token: string): TokenPayload => {
   try {
-    req.user = verifyToken(token);
-    next();
+    return verifyToken(token);
   } catch {
-    next(new AppError("Invalid or expired token.", 401));
+    throw rejectWith("Invalid or expired token.", 401);
   }
 };
 
-export const authorize = (...roles: string[]) => {
-  return (
-    req: AuthenticatedRequest,
-    _res: Response,
-    next: NextFunction,
-  ): void => {
-    if (!req.user || !roles.includes(req.user.role)) {
-      return next(
-        new AppError("You do not have permission to perform this action.", 403),
-      );
-    }
-    next();
-  };
+export const authenticateWithSpecification: SecurityHandlers[string] = async (
+  request,
+) => {
+  const user = verifyBearerToken(readBearerToken(request));
+  const allowedRoles = (request as Request & { openapi?: OperationMetadata })
+    .openapi?.schema?.["x-roles"];
+
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    throw rejectWith(
+      "You do not have permission to perform this action.",
+      403,
+    );
+  }
+
+  (request as AuthenticatedRequest).user = user;
+  return true;
 };

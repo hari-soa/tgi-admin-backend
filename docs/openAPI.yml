@@ -1,27 +1,26 @@
 openapi: 3.0.3
 info:
   title: TGI Admin API
-  version: 2.0.0
-  description: |
+  version: 3.0.0
+  description: |-
     REST API of the TGI school administration application.
 
-    **Authentication** – every route except `POST /auth/login` requires the header
-    `Authorization: Bearer <token>`. The login credentials are the account **email**
-    and the **matricule** (the matricule is the password of every account).
+    **Single source of truth** – this document drives the server (routing by `operationId`, bearer authentication, role control with `x-roles`, request validation) and the frontend (path, method and parameters of every operation are read from `GET /api/v1/spec`). There is no separate route file.
 
-    **Responses** – successful responses always look like
-    `{ "status": "success", "message"?: string, "results"?: number, "data": { ... } }`.
-    Errors look like `{ "status": "fail" | "error", "message": string, "errors"?: [...] }`.
+    **Authentication** – every operation except `login` and `getApiSpecification` requires `Authorization: Bearer <token>`. The login credentials are the account **email** and the **matricule**.
 
-    **Roles** – `ADMIN`, `SECRETARY`, `TEACHER`, `STUDENT`.
+    **Responses** – successful responses look like `{ "status": "success", "message"?: string, "results"?: number, "data": { ... } }`. Errors look like `{ "status": "fail" | "error", "message": string, "errors"?: [...] }`.
 
-    **Grade workflow** – the admin opens a *grade session* (class + subject + exam + term),
-    the secretary fills and submits it, the admin validates it: grades are published and the
-    annual report card of each student is recomputed automatically.
+    **Roles** – `ADMIN`, `SECRETARY`, `TEACHER`, `STUDENT`. The roles allowed on an operation are listed in `x-roles`.
+
+    **Super administrator** – only the super administrator can read, update or reach his own account. Nobody can delete it.
+
+    **Grade workflow** – the admin opens a grade session, the secretary fills and submits it (grades are out of 20, a missing grade means the student is absent), the admin can correct the submitted grades then validates the session: grades are published and each report card is recomputed with the coefficients of the subjects.
 servers:
   - url: /api/v1
     description: Current server
 tags:
+  - name: Specification
   - name: Auth
   - name: Users
   - name: Subjects
@@ -30,1691 +29,3424 @@ tags:
   - name: Attendance
   - name: Grades
   - name: Results
-
 security:
   - bearerAuth: []
-
 paths:
+  /spec:
+    get:
+      tags:
+        - Specification
+      operationId: getApiSpecification
+      summary: OpenAPI specification of this API, as JSON
+      description: The frontend reads this document to find the path, the method and the parameters of every operation from its operationId.
+      security: []
+      responses:
+        '200':
+          description: OpenAPI document
+          content:
+            application/json:
+              schema:
+                type: object
   /auth/login:
     post:
-      tags: [Auth]
+      tags:
+        - Auth
+      operationId: login
       summary: Log in with email and matricule
       security: []
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/LoginRequest" }
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
       responses:
-        "200":
+        '200':
           description: Login successful
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: "#/components/schemas/SuccessEnvelope"
-                  - type: object
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
                     properties:
-                      data: { $ref: "#/components/schemas/LoginResult" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403":
-          description: The student account has been deactivated
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
-
+                      token:
+                        type: string
+                      user:
+                        $ref: '#/components/schemas/LoginUser'
+                      redirectUrl:
+                        type: string
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /auth/me:
     get:
-      tags: [Auth]
+      tags:
+        - Auth
+      operationId: getAuthenticatedUser
       summary: Profile of the authenticated user
+      x-roles:
+        - ADMIN
+        - SECRETARY
+        - TEACHER
+        - STUDENT
       responses:
-        "200": { $ref: "#/components/responses/UserResponse" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
+        '200':
+          description: Authenticated user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /users:
     get:
-      tags: [Users]
-      summary: List users (ADMIN, SECRETARY)
+      tags:
+        - Users
+      operationId: listUsers
+      summary: List users
+      description: The super administrator is only listed to the super administrator.
+      x-roles:
+        - ADMIN
+        - SECRETARY
       parameters:
-        - { name: role, in: query, schema: { $ref: "#/components/schemas/UserRole" } }
-        - { name: classGroup, in: query, schema: { $ref: "#/components/schemas/ClassGroup" } }
+        - name: role
+          in: query
+          schema:
+            $ref: '#/components/schemas/UserRole'
+        - name: classGroup
+          in: query
+          schema:
+            $ref: '#/components/schemas/ClassGroup'
         - name: search
           in: query
           description: Matches first name, last name, email or matricule
-          schema: { type: string }
+          schema:
+            type: string
       responses:
-        "200":
+        '200':
           description: Users
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: "#/components/schemas/SuccessEnvelope"
-                  - type: object
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  results:
+                    type: integer
+                  data:
+                    type: object
                     properties:
-                      data:
-                        type: object
-                        properties:
-                          users:
-                            type: array
-                            items: { $ref: "#/components/schemas/User" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-
+                      users:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /users/me:
     get:
-      tags: [Users]
+      tags:
+        - Users
+      operationId: getMyProfile
       summary: Profile of the authenticated user
+      x-roles:
+        - ADMIN
+        - SECRETARY
+        - TEACHER
+        - STUDENT
       responses:
-        "200": { $ref: "#/components/responses/UserResponse" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-
+        '200':
+          description: Profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /users/staff:
     get:
-      tags: [Users]
-      summary: List the staff (every non-student account), open to any authenticated user
+      tags:
+        - Users
+      operationId: listStaff
+      summary: List the staff (every non-student account)
+      description: The super administrator is only listed to the super administrator.
+      x-roles:
+        - ADMIN
+        - SECRETARY
+        - TEACHER
+        - STUDENT
       responses:
-        "200":
+        '200':
           description: Staff members
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: "#/components/schemas/SuccessEnvelope"
-                  - type: object
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  results:
+                    type: integer
+                  data:
+                    type: object
                     properties:
-                      data:
-                        type: object
-                        properties:
-                          users:
-                            type: array
-                            items: { $ref: "#/components/schemas/User" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-
+                      users:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /users/admin:
     post:
-      tags: [Users]
-      summary: Create an administrator (ADMIN)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/CreateAdministratorRequest" }
-      responses:
-        "201": { $ref: "#/components/responses/UserCreated" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-
-  /users/students:
-    post:
-      tags: [Users]
-      summary: Create a student (ADMIN, SECRETARY)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/CreateStudentRequest" }
-      responses:
-        "201": { $ref: "#/components/responses/UserCreated" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-
-  /users/secretary:
-    post:
-      tags: [Users]
-      summary: Create a secretary (ADMIN)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/CreateSecretaryRequest" }
-      responses:
-        "201": { $ref: "#/components/responses/UserCreated" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-
-  /users/teachers:
-    post:
-      tags: [Users]
-      summary: Create a teacher (ADMIN)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/CreateTeacherRequest" }
-      responses:
-        "201": { $ref: "#/components/responses/UserCreated" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-
-  /users/students/{id}/deactivate:
-    patch:
-      tags: [Users]
-      summary: Deactivate a student account (ADMIN)
-      parameters:
-        - $ref: "#/components/parameters/IdPath"
-      responses:
-        "200":
-          description: Student deactivated
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/SuccessEnvelope" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
-  /users/{id}:
-    parameters:
-      - $ref: "#/components/parameters/IdPath"
-    get:
-      tags: [Users]
-      summary: Get a user (ADMIN, SECRETARY)
-      responses:
-        "200": { $ref: "#/components/responses/UserResponse" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-    patch:
-      tags: [Users]
-      summary: Update a user (ADMIN)
-      description: |
-        Only the fields that belong to the role of the target user are applied.
-        Changing the `matricule` also renews the login credential unless a `password` is given.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/UpdateUserRequest" }
-      responses:
-        "200": { $ref: "#/components/responses/UserResponse" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-    delete:
-      tags: [Users]
-      summary: Delete a user (ADMIN, not yourself)
-      responses:
-        "204": { description: User deleted }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
-  /subjects:
-    get:
-      tags: [Subjects]
-      summary: List active subjects with their teacher per class
-      responses:
-        "200":
-          description: Subjects
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/SuccessEnvelope"
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          subjects:
-                            type: array
-                            items: { $ref: "#/components/schemas/Subject" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-    post:
-      tags: [Subjects]
-      summary: Create a subject (ADMIN)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/CreateSubjectRequest" }
-      responses:
-        "201": { $ref: "#/components/responses/SubjectResponse" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-
-  /subjects/{id}:
-    parameters:
-      - $ref: "#/components/parameters/IdPath"
-    get:
-      tags: [Subjects]
-      summary: Get a subject
-      responses:
-        "200": { $ref: "#/components/responses/SubjectResponse" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "404": { $ref: "#/components/responses/NotFound" }
-    patch:
-      tags: [Subjects]
-      summary: Update a subject (ADMIN)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/UpdateSubjectRequest" }
-      responses:
-        "200": { $ref: "#/components/responses/SubjectResponse" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-    delete:
-      tags: [Subjects]
-      summary: Deactivate a subject (ADMIN)
-      responses:
-        "204": { description: Subject deactivated }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
-  /announcements:
-    get:
-      tags: [Announcements]
-      summary: List announcements (students only receive the ones addressed to their class)
-      responses:
-        "200":
-          description: Announcements
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/SuccessEnvelope"
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          announcements:
-                            type: array
-                            items: { $ref: "#/components/schemas/Announcement" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-    post:
-      tags: [Announcements]
-      summary: Create an announcement (ADMIN)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/CreateAnnouncementRequest" }
-      responses:
-        "201": { $ref: "#/components/responses/AnnouncementResponse" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-
-  /announcements/{id}:
-    parameters:
-      - $ref: "#/components/parameters/IdPath"
-    get:
-      tags: [Announcements]
-      summary: Get an announcement
-      responses:
-        "200": { $ref: "#/components/responses/AnnouncementResponse" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "404": { $ref: "#/components/responses/NotFound" }
-    patch:
-      tags: [Announcements]
-      summary: Update an announcement (ADMIN)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/UpdateAnnouncementRequest" }
-      responses:
-        "200": { $ref: "#/components/responses/AnnouncementResponse" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-    delete:
-      tags: [Announcements]
-      summary: Delete an announcement (ADMIN)
-      responses:
-        "204": { description: Announcement deleted }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
-  /disciplinary/history/student/{studentId}:
-    get:
-      tags: [Disciplinary]
-      summary: History records of a student (staff, or the student themself)
-      parameters:
-        - $ref: "#/components/parameters/StudentIdPath"
-      responses:
-        "200":
-          description: History records, most recent first
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/SuccessEnvelope"
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          records:
-                            type: array
-                            items: { $ref: "#/components/schemas/StudentHistoryRecord" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-
-  /disciplinary/remarks/student/{studentId}:
-    get:
-      tags: [Disciplinary]
-      summary: Remarks about a student (staff, or the student themself)
-      parameters:
-        - $ref: "#/components/parameters/StudentIdPath"
-      responses:
-        "200":
-          description: Remarks, most recent first
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/SuccessEnvelope"
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          remarks:
-                            type: array
-                            items: { $ref: "#/components/schemas/StudentRemark" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-
-  /disciplinary/history:
-    post:
-      tags: [Disciplinary]
-      summary: Add a history record (ADMIN)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/CreateStudentHistoryRequest" }
-      responses:
-        "201":
-          description: Record created
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/SuccessEnvelope"
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          record: { $ref: "#/components/schemas/StudentHistoryRecord" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
-  /disciplinary/history/{id}:
-    parameters:
-      - $ref: "#/components/parameters/IdPath"
-    patch:
-      tags: [Disciplinary]
-      summary: Update a history record (ADMIN)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/UpdateStudentHistoryRequest" }
-      responses:
-        "200":
-          description: Record updated
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/SuccessEnvelope"
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          record: { $ref: "#/components/schemas/StudentHistoryRecord" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-    delete:
-      tags: [Disciplinary]
-      summary: Delete a history record (ADMIN)
-      responses:
-        "204": { description: Record deleted }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
-  /disciplinary/remarks:
-    post:
-      tags: [Disciplinary]
-      summary: Add a remark (ADMIN)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/CreateStudentRemarkRequest" }
-      responses:
-        "201":
-          description: Remark created
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/SuccessEnvelope"
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          remark: { $ref: "#/components/schemas/StudentRemark" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
-  /disciplinary/remarks/{id}:
-    parameters:
-      - $ref: "#/components/parameters/IdPath"
-    patch:
-      tags: [Disciplinary]
-      summary: Update a remark (ADMIN)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/UpdateStudentRemarkRequest" }
-      responses:
-        "200":
-          description: Remark updated
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/SuccessEnvelope"
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          remark: { $ref: "#/components/schemas/StudentRemark" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-    delete:
-      tags: [Disciplinary]
-      summary: Delete a remark (ADMIN)
-      responses:
-        "204": { description: Remark deleted }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
-  /attendance/slots:
-    post:
-      tags: [Attendance]
-      summary: Create a weekly teaching slot (ADMIN)
-      description: A teacher cannot be in more than 2 classrooms at the same time.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/AttendanceSlotRequest" }
-      responses:
-        "201": { $ref: "#/components/responses/AttendanceSlotResponse" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-
-  /attendance/slots/{slotId}:
-    parameters:
-      - $ref: "#/components/parameters/SlotIdPath"
-    patch:
-      tags: [Attendance]
-      summary: Update a slot (ADMIN)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/UpdateAttendanceSlotRequest" }
-      responses:
-        "200": { $ref: "#/components/responses/AttendanceSlotResponse" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-    delete:
-      tags: [Attendance]
-      summary: Delete a slot (ADMIN)
-      responses:
-        "204": { description: Slot deleted }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
-  /attendance/daily:
-    get:
-      tags: [Attendance]
-      summary: Attendance cards of a given day (ADMIN)
-      description: One card per slot of that weekday, with the status recorded for the given date (`PENDING` when nothing is recorded yet).
-      parameters:
-        - { name: day, in: query, required: true, schema: { $ref: "#/components/schemas/DayOfWeek" } }
-        - { name: date, in: query, required: true, description: Calendar date matching the weekday, schema: { type: string, format: date } }
-      responses:
-        "200":
-          description: Cards ordered by start time
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/SuccessEnvelope"
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          cards:
-                            type: array
-                            items: { $ref: "#/components/schemas/AttendanceCard" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-
-  /attendance/check:
-    post:
-      tags: [Attendance]
-      summary: Record the arrival of a teacher (ADMIN)
-      description: |
-        The status is `LATE` when the check happens after the slot start (school time zone) and
-        the date is today, `PRESENT` otherwise. Calling it again overwrites the record.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/CheckAttendanceRequest" }
-      responses:
-        "200": { $ref: "#/components/responses/AttendanceResponse" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
-  /attendance/absence:
-    post:
-      tags: [Attendance]
-      summary: Record the absence of a teacher (ADMIN)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/MarkAbsenceRequest" }
-      responses:
-        "200": { $ref: "#/components/responses/AttendanceResponse" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
-  /attendance/slots/{slotId}/motif:
-    parameters:
-      - $ref: "#/components/parameters/SlotIdPath"
-    patch:
-      tags: [Attendance]
-      summary: Set the motif of a recorded lateness or absence (ADMIN)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/UpdateAttendanceMotifRequest" }
-      responses:
-        "200": { $ref: "#/components/responses/AttendanceResponse" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
-  /attendance/summaries:
-    get:
-      tags: [Attendance]
-      summary: Lateness and absence totals per teacher, subject and class (ADMIN)
-      parameters:
-        - { name: teacherId, in: query, schema: { type: string, format: uuid } }
-      responses:
-        "200":
-          description: Summaries ordered by number of occurrences
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/SuccessEnvelope"
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          summaries:
-                            type: array
-                            items: { $ref: "#/components/schemas/AttendanceSummary" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-
-  /grades:
-    get:
-      tags: [Grades]
-      summary: List every grade (ADMIN, SECRETARY)
-      responses:
-        "200":
-          description: Grades
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/SuccessEnvelope"
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          grades:
-                            type: array
-                            items: { $ref: "#/components/schemas/Grade" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-    post:
-      tags: [Grades]
-      summary: Create a single draft grade (SECRETARY)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/CreateGradeRequest" }
-      responses:
-        "201": { $ref: "#/components/responses/GradeResponse" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-
-  /grades/sessions:
-    get:
-      tags: [Grades]
-      summary: List grade sessions (ADMIN sees all, SECRETARY sees open and pending ones)
-      responses:
-        "200":
-          description: Sessions
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/SuccessEnvelope"
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          sessions:
-                            type: array
-                            items: { $ref: "#/components/schemas/GradeSession" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-    post:
-      tags: [Grades]
-      summary: Open a grade session (ADMIN)
-      description: One session per class, subject, exam type, term and academic year.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/CreateGradeSessionRequest" }
-      responses:
-        "201": { $ref: "#/components/responses/GradeSessionResponse" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
-  /grades/sessions/{id}/draft:
-    put:
-      tags: [Grades]
-      summary: Save the draft of an open session (SECRETARY)
-      parameters:
-        - $ref: "#/components/parameters/IdPath"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/SessionGradesRequest" }
-      responses:
-        "200": { $ref: "#/components/responses/GradeSessionResponse" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "409": { $ref: "#/components/responses/Conflict" }
-
-  /grades/sessions/{id}/submit:
-    post:
-      tags: [Grades]
-      summary: Submit an open session for review (SECRETARY)
-      description: Grades are stored as `PENDING` and the session becomes `PENDING_REVIEW`.
-      parameters:
-        - $ref: "#/components/parameters/IdPath"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/SessionGradesRequest" }
-      responses:
-        "200": { $ref: "#/components/responses/GradeSessionResponse" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "409": { $ref: "#/components/responses/Conflict" }
-
-  /grades/sessions/{id}/validate:
-    patch:
-      tags: [Grades]
-      summary: Validate a submitted session (ADMIN)
-      description: Publishes the grades and recomputes the published annual result (report card) of every student of the session.
-      parameters:
-        - $ref: "#/components/parameters/IdPath"
-      responses:
-        "200": { $ref: "#/components/responses/GradeSessionResponse" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "409": { $ref: "#/components/responses/Conflict" }
-
-  /grades/{id}:
-    parameters:
-      - $ref: "#/components/parameters/IdPath"
-    get:
-      tags: [Grades]
-      summary: Get a grade (ADMIN, SECRETARY)
-      responses:
-        "200": { $ref: "#/components/responses/GradeResponse" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-    put:
-      tags: [Grades]
-      summary: Update a grade value, max score or date (ADMIN, SECRETARY)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/UpdateGradeRequest" }
-      responses:
-        "200": { $ref: "#/components/responses/GradeResponse" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-    delete:
-      tags: [Grades]
-      summary: Delete a grade (ADMIN)
-      responses:
-        "204": { description: Grade deleted }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
-  /grades/{id}/review:
-    patch:
-      tags: [Grades]
-      summary: Change the status of one grade (ADMIN)
-      parameters:
-        - $ref: "#/components/parameters/IdPath"
+      tags:
+        - Users
+      operationId: createAdministrator
+      summary: Create an administrator
+      x-roles:
+        - ADMIN
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [status]
-              properties:
-                status: { $ref: "#/components/schemas/GradeStatus" }
+              $ref: '#/components/schemas/CreateAdministratorRequest'
       responses:
-        "200": { $ref: "#/components/responses/GradeResponse" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
-  /results:
-    post:
-      tags: [Results]
-      summary: Create or replace an annual result by hand (SECRETARY)
-      description: Results are normally generated when a grade session is validated. One result exists per student and academic year.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/CreateAnnualResultRequest" }
-      responses:
-        "201": { $ref: "#/components/responses/AnnualResultResponse" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-
-  /results/student/{studentId}:
-    get:
-      tags: [Results]
-      summary: Annual results of a student (staff, or the student themself — published ones only)
-      parameters:
-        - $ref: "#/components/parameters/StudentIdPath"
-      responses:
-        "200":
-          description: Results with their subject breakdown, most recent year first
+        '201':
+          description: User created
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: "#/components/schemas/SuccessEnvelope"
-                  - type: object
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
                     properties:
-                      data:
-                        type: object
-                        properties:
-                          results:
-                            type: array
-                            items: { $ref: "#/components/schemas/AnnualResult" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-
-  /results/{id}:
-    get:
-      tags: [Results]
-      summary: Get one annual result
-      parameters:
-        - $ref: "#/components/parameters/IdPath"
-      responses:
-        "200": { $ref: "#/components/responses/AnnualResultResponse" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
-  /results/{id}/review:
-    patch:
-      tags: [Results]
-      summary: Set the status and/or the council decision of a result (ADMIN)
-      parameters:
-        - $ref: "#/components/parameters/IdPath"
+                      user:
+                        $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /users/students:
+    post:
+      tags:
+        - Users
+      operationId: createStudent
+      summary: Create a student
+      x-roles:
+        - ADMIN
+        - SECRETARY
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/UpdateAnnualResultRequest" }
+            schema:
+              $ref: '#/components/schemas/CreateStudentRequest'
       responses:
-        "200": { $ref: "#/components/responses/AnnualResultResponse" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /users/secretary:
+    post:
+      tags:
+        - Users
+      operationId: createSecretary
+      summary: Create a secretary
+      x-roles:
+        - ADMIN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSecretaryRequest'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /users/teachers:
+    post:
+      tags:
+        - Users
+      operationId: createTeacher
+      summary: Create a teacher
+      x-roles:
+        - ADMIN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTeacherRequest'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /users/students/{id}/deactivate:
+    patch:
+      tags:
+        - Users
+      operationId: deactivateStudent
+      summary: Deactivate a student account
+      x-roles:
+        - ADMIN
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Student deactivated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties: {}
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /users/{id}:
+    get:
+      tags:
+        - Users
+      operationId: getUserById
+      summary: Get a user
+      description: The super administrator can only be read by the super administrator.
+      x-roles:
+        - ADMIN
+        - SECRETARY
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: User
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+        - Users
+      operationId: updateUser
+      summary: Update a user
+      description: Only the fields that belong to the role of the target user are applied. Email and contact number are filled here, not at creation. Changing the matricule also renews the login credential unless a password is given. The super administrator can only be updated by the super administrator.
+      x-roles:
+        - ADMIN
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Users
+      operationId: deleteUser
+      summary: Delete a user
+      description: Nobody can delete the super administrator, not even the super administrator. Nobody can delete their own account.
+      x-roles:
+        - ADMIN
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '204':
+          description: User deleted
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /subjects:
+    get:
+      tags:
+        - Subjects
+      operationId: listSubjects
+      summary: List active subjects with their teacher per class
+      x-roles:
+        - ADMIN
+        - SECRETARY
+        - TEACHER
+        - STUDENT
+      responses:
+        '200':
+          description: Subjects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  results:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      subjects:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Subject'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags:
+        - Subjects
+      operationId: createSubject
+      summary: Create a subject
+      x-roles:
+        - ADMIN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSubjectRequest'
+      responses:
+        '201':
+          description: Subject created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      subject:
+                        $ref: '#/components/schemas/Subject'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /subjects/{id}:
+    get:
+      tags:
+        - Subjects
+      operationId: getSubjectById
+      summary: Get a subject
+      x-roles:
+        - ADMIN
+        - SECRETARY
+        - TEACHER
+        - STUDENT
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Subject
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      subject:
+                        $ref: '#/components/schemas/Subject'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+        - Subjects
+      operationId: updateSubject
+      summary: Update a subject
+      x-roles:
+        - ADMIN
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSubjectRequest'
+      responses:
+        '200':
+          description: Subject updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      subject:
+                        $ref: '#/components/schemas/Subject'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Subjects
+      operationId: deleteSubject
+      summary: Deactivate a subject
+      x-roles:
+        - ADMIN
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '204':
+          description: Subject deactivated
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /announcements:
+    get:
+      tags:
+        - Announcements
+      operationId: listAnnouncements
+      summary: List announcements
+      description: Students only receive the announcements addressed to everyone or to their class.
+      x-roles:
+        - ADMIN
+        - SECRETARY
+        - TEACHER
+        - STUDENT
+      responses:
+        '200':
+          description: Announcements
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  results:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      announcements:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Announcement'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags:
+        - Announcements
+      operationId: createAnnouncement
+      summary: Create an announcement
+      x-roles:
+        - ADMIN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAnnouncementRequest'
+      responses:
+        '201':
+          description: Announcement created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      announcement:
+                        $ref: '#/components/schemas/Announcement'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /announcements/{id}:
+    get:
+      tags:
+        - Announcements
+      operationId: getAnnouncementById
+      summary: Get an announcement
+      x-roles:
+        - ADMIN
+        - SECRETARY
+        - TEACHER
+        - STUDENT
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Announcement
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      announcement:
+                        $ref: '#/components/schemas/Announcement'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+        - Announcements
+      operationId: updateAnnouncement
+      summary: Update an announcement
+      x-roles:
+        - ADMIN
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAnnouncementRequest'
+      responses:
+        '200':
+          description: Announcement updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      announcement:
+                        $ref: '#/components/schemas/Announcement'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Announcements
+      operationId: deleteAnnouncement
+      summary: Delete an announcement
+      x-roles:
+        - ADMIN
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '204':
+          description: Announcement deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /disciplinary/history/student/{studentId}:
+    get:
+      tags:
+        - Disciplinary
+      operationId: getStudentHistory
+      summary: History records of a student
+      description: Staff can read any student, a student only reads their own records.
+      x-roles:
+        - ADMIN
+        - SECRETARY
+        - TEACHER
+        - STUDENT
+      parameters:
+        - $ref: '#/components/parameters/StudentIdPath'
+      responses:
+        '200':
+          description: History records
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  results:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      records:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/HistoryRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /disciplinary/remarks/student/{studentId}:
+    get:
+      tags:
+        - Disciplinary
+      operationId: getStudentRemarks
+      summary: Remarks of a student
+      x-roles:
+        - ADMIN
+        - SECRETARY
+        - TEACHER
+        - STUDENT
+      parameters:
+        - $ref: '#/components/parameters/StudentIdPath'
+      responses:
+        '200':
+          description: Remarks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  results:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      remarks:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Remark'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /disciplinary/history:
+    post:
+      tags:
+        - Disciplinary
+      operationId: createHistoryRecord
+      summary: Add a history record to a student
+      x-roles:
+        - ADMIN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateHistoryRecordRequest'
+      responses:
+        '201':
+          description: Record created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      record:
+                        $ref: '#/components/schemas/HistoryRecord'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /disciplinary/history/{id}:
+    patch:
+      tags:
+        - Disciplinary
+      operationId: updateHistoryRecord
+      summary: Update a history record
+      x-roles:
+        - ADMIN
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateHistoryRecordRequest'
+      responses:
+        '200':
+          description: Record updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      record:
+                        $ref: '#/components/schemas/HistoryRecord'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Disciplinary
+      operationId: deleteHistoryRecord
+      summary: Delete a history record
+      x-roles:
+        - ADMIN
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '204':
+          description: Record deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /disciplinary/remarks:
+    post:
+      tags:
+        - Disciplinary
+      operationId: createRemark
+      summary: Add a remark to a student
+      x-roles:
+        - ADMIN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRemarkRequest'
+      responses:
+        '201':
+          description: Remark created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      remark:
+                        $ref: '#/components/schemas/Remark'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /disciplinary/remarks/{id}:
+    patch:
+      tags:
+        - Disciplinary
+      operationId: updateRemark
+      summary: Update a remark
+      x-roles:
+        - ADMIN
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRemarkRequest'
+      responses:
+        '200':
+          description: Remark updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      remark:
+                        $ref: '#/components/schemas/Remark'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Disciplinary
+      operationId: deleteRemark
+      summary: Delete a remark
+      x-roles:
+        - ADMIN
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '204':
+          description: Remark deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /attendance/slots:
+    post:
+      tags:
+        - Attendance
+      operationId: createAttendanceSlot
+      summary: Create a teacher attendance slot
+      description: A teacher cannot have more than two overlapping slots.
+      x-roles:
+        - ADMIN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAttendanceSlotRequest'
+      responses:
+        '201':
+          description: Slot created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      slot:
+                        $ref: '#/components/schemas/AttendanceSlot'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /attendance/slots/{slotId}:
+    patch:
+      tags:
+        - Attendance
+      operationId: updateAttendanceSlot
+      summary: Update an attendance slot
+      x-roles:
+        - ADMIN
+      parameters:
+        - $ref: '#/components/parameters/SlotIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAttendanceSlotRequest'
+      responses:
+        '200':
+          description: Slot updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      slot:
+                        $ref: '#/components/schemas/AttendanceSlot'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Attendance
+      operationId: deleteAttendanceSlot
+      summary: Delete an attendance slot
+      x-roles:
+        - ADMIN
+      parameters:
+        - $ref: '#/components/parameters/SlotIdPath'
+      responses:
+        '204':
+          description: Slot deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /attendance/daily:
+    get:
+      tags:
+        - Attendance
+      operationId: getDailyAttendance
+      summary: Attendance cards of a day
+      x-roles:
+        - ADMIN
+      parameters:
+        - name: day
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/DayOfWeek'
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+            example: '2026-11-21'
+      responses:
+        '200':
+          description: Cards
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  results:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      cards:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AttendanceCard'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /attendance/check:
+    post:
+      tags:
+        - Attendance
+      operationId: checkAttendance
+      summary: Record the arrival of a teacher
+      description: The status is LATE when the arrival is after the start of the slot, computed in the school time zone.
+      x-roles:
+        - ADMIN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckAttendanceRequest'
+      responses:
+        '200':
+          description: Attendance recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      attendance:
+                        $ref: '#/components/schemas/Attendance'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /attendance/absence:
+    post:
+      tags:
+        - Attendance
+      operationId: markAttendanceAbsence
+      summary: Record the absence of a teacher
+      x-roles:
+        - ADMIN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarkAbsenceRequest'
+      responses:
+        '200':
+          description: Absence recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      attendance:
+                        $ref: '#/components/schemas/Attendance'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /attendance/slots/{slotId}/motif:
+    patch:
+      tags:
+        - Attendance
+      operationId: updateAttendanceMotif
+      summary: Set the motif of a late or absent slot
+      x-roles:
+        - ADMIN
+      parameters:
+        - $ref: '#/components/parameters/SlotIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAttendanceMotifRequest'
+      responses:
+        '200':
+          description: Motif updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      attendance:
+                        $ref: '#/components/schemas/Attendance'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /attendance/summaries:
+    get:
+      tags:
+        - Attendance
+      operationId: getAttendanceSummaries
+      summary: Lateness and absence summaries per teacher
+      x-roles:
+        - ADMIN
+      parameters:
+        - name: teacherId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Summaries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  results:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      summaries:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AttendanceSummary'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /grades:
+    get:
+      tags:
+        - Grades
+      operationId: listGrades
+      summary: List grades
+      x-roles:
+        - ADMIN
+        - SECRETARY
+      responses:
+        '200':
+          description: Grades
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  results:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      grades:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Grade'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+        - Grades
+      operationId: createGrade
+      summary: Create a single draft grade (out of 20)
+      x-roles:
+        - SECRETARY
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGradeRequest'
+      responses:
+        '201':
+          description: Grade created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      grade:
+                        $ref: '#/components/schemas/Grade'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /grades/sessions:
+    get:
+      tags:
+        - Grades
+      operationId: listGradeSessions
+      summary: List grade sessions
+      description: The admin sees every session, the secretary only the open ones and the ones pending review.
+      x-roles:
+        - ADMIN
+        - SECRETARY
+      responses:
+        '200':
+          description: Sessions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  results:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      sessions:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/GradeSession'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+        - Grades
+      operationId: createGradeSession
+      summary: Open a grade session
+      x-roles:
+        - ADMIN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGradeSessionRequest'
+      responses:
+        '201':
+          description: Session created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      session:
+                        $ref: '#/components/schemas/GradeSession'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /grades/sessions/{id}/draft:
+    put:
+      tags:
+        - Grades
+      operationId: saveGradeSessionDraft
+      summary: Save the draft of an open session
+      x-roles:
+        - SECRETARY
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveGradeSessionRequest'
+      responses:
+        '200':
+          description: Draft saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      session:
+                        $ref: '#/components/schemas/GradeSession'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /grades/sessions/{id}/submit:
+    post:
+      tags:
+        - Grades
+      operationId: submitGradeSession
+      summary: Submit an open session to the admin
+      description: 'Every active student of the class without a grade is automatically marked absent: an ABSENCE record is added to their file with the current date and time, and the student is not ranked for the subject.'
+      x-roles:
+        - SECRETARY
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveGradeSessionRequest'
+      responses:
+        '200':
+          description: Session submitted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      session:
+                        $ref: '#/components/schemas/GradeSession'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /grades/sessions/{id}/revision:
+    put:
+      tags:
+        - Grades
+      operationId: reviseGradeSession
+      summary: Correct the submitted grades of a session pending review
+      description: The admin edits the grades submitted by the secretary before publishing them, and writes the motif of each absence.
+      x-roles:
+        - ADMIN
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviseGradeSessionRequest'
+      responses:
+        '200':
+          description: Session revised
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      session:
+                        $ref: '#/components/schemas/GradeSession'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /grades/sessions/{id}/validate:
+    patch:
+      tags:
+        - Grades
+      operationId: validateGradeSession
+      summary: Validate a session and publish its grades
+      description: 'Grades are published and the report card of every student is recomputed: every grade is multiplied by the coefficient of its subject.'
+      x-roles:
+        - ADMIN
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Session validated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      session:
+                        $ref: '#/components/schemas/GradeSession'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /grades/{id}:
+    get:
+      tags:
+        - Grades
+      operationId: getGradeById
+      summary: Get a grade
+      x-roles:
+        - ADMIN
+        - SECRETARY
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Grade
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      grade:
+                        $ref: '#/components/schemas/Grade'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags:
+        - Grades
+      operationId: updateGrade
+      summary: Update a grade
+      x-roles:
+        - ADMIN
+        - SECRETARY
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateGradeRequest'
+      responses:
+        '200':
+          description: Grade updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      grade:
+                        $ref: '#/components/schemas/Grade'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Grades
+      operationId: deleteGrade
+      summary: Delete a grade
+      x-roles:
+        - ADMIN
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '204':
+          description: Grade deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /grades/{id}/review:
+    patch:
+      tags:
+        - Grades
+      operationId: reviewGrade
+      summary: Change the status of a grade
+      x-roles:
+        - ADMIN
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewGradeRequest'
+      responses:
+        '200':
+          description: Grade reviewed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      grade:
+                        $ref: '#/components/schemas/Grade'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /results:
+    post:
+      tags:
+        - Results
+      operationId: createResult
+      summary: Create or replace the report card of a student for a year
+      x-roles:
+        - SECRETARY
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateResultRequest'
+      responses:
+        '201':
+          description: Result created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      result:
+                        $ref: '#/components/schemas/AnnualResult'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /results/student/{studentId}:
+    get:
+      tags:
+        - Results
+      operationId: getStudentResults
+      summary: Report cards of a student
+      description: A student only sees their own published report cards.
+      x-roles:
+        - ADMIN
+        - SECRETARY
+        - TEACHER
+        - STUDENT
+      parameters:
+        - $ref: '#/components/parameters/StudentIdPath'
+      responses:
+        '200':
+          description: Results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  results:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AnnualResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /results/{id}:
+    get:
+      tags:
+        - Results
+      operationId: getResultById
+      summary: Get a report card
+      x-roles:
+        - ADMIN
+        - SECRETARY
+        - TEACHER
+        - STUDENT
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      result:
+                        $ref: '#/components/schemas/AnnualResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /results/{id}/review:
+    patch:
+      tags:
+        - Results
+      operationId: reviewResult
+      summary: Change the status or the decision of a report card
+      x-roles:
+        - ADMIN
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewResultRequest'
+      responses:
+        '200':
+          description: Result reviewed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      result:
+                        $ref: '#/components/schemas/AnnualResult'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /results/{id}/pdf:
     get:
-      tags: [Results]
+      tags:
+        - Results
+      operationId: exportResultPdf
       summary: Generate the PDF of a report card
-      description: Returns the path of the generated file, served by the API under `/uploads/report-cards/` (outside `/api/v1`).
+      x-roles:
+        - ADMIN
+        - SECRETARY
+        - TEACHER
+        - STUDENT
       parameters:
-        - $ref: "#/components/parameters/IdPath"
+        - $ref: '#/components/parameters/IdPath'
       responses:
-        "200":
+        '200':
           description: PDF generated
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: "#/components/schemas/SuccessEnvelope"
-                  - type: object
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
                     properties:
-                      data:
-                        type: object
-                        properties:
-                          pdfUrl: { type: string, example: /uploads/report-cards/report-card_<studentId>_2026-2027.pdf }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
+                      pdfUrl:
+                        type: string
+                        example: /uploads/report-cards/report-card_<studentId>_2026-2027.pdf
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-
   parameters:
     IdPath:
       name: id
       in: path
       required: true
-      schema: { type: string, format: uuid }
+      schema:
+        type: string
+        format: uuid
     StudentIdPath:
       name: studentId
       in: path
       required: true
-      schema: { type: string, format: uuid }
+      schema:
+        type: string
+        format: uuid
     SlotIdPath:
       name: slotId
       in: path
       required: true
-      schema: { type: string, format: uuid }
-
+      schema:
+        type: string
+        format: uuid
   responses:
     ValidationError:
-      description: Invalid input data or business rule violation
+      description: Invalid input data
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/ErrorResponse" }
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
     Unauthorized:
       description: Missing, invalid or expired token
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/ErrorResponse" }
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
     Forbidden:
-      description: The role of the user does not allow this action
+      description: The role of the user is not allowed to perform this operation
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/ErrorResponse" }
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
     NotFound:
       description: Resource not found
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/ErrorResponse" }
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
     Conflict:
-      description: The resource is not in the status required by this action
-      content:
-        application/json:
-          schema: { $ref: "#/components/schemas/ErrorResponse" }
-    UserResponse:
-      description: A user
+      description: The resource is not in a state that allows this operation
       content:
         application/json:
           schema:
-            allOf:
-              - $ref: "#/components/schemas/SuccessEnvelope"
-              - type: object
-                properties:
-                  data:
-                    type: object
-                    properties:
-                      user: { $ref: "#/components/schemas/User" }
-    UserCreated:
-      description: User created. The matricule is the initial password.
-      content:
-        application/json:
-          schema:
-            allOf:
-              - $ref: "#/components/schemas/SuccessEnvelope"
-              - type: object
-                properties:
-                  data:
-                    type: object
-                    properties:
-                      user: { $ref: "#/components/schemas/User" }
-    SubjectResponse:
-      description: A subject
-      content:
-        application/json:
-          schema:
-            allOf:
-              - $ref: "#/components/schemas/SuccessEnvelope"
-              - type: object
-                properties:
-                  data:
-                    type: object
-                    properties:
-                      subject: { $ref: "#/components/schemas/Subject" }
-    AnnouncementResponse:
-      description: An announcement
-      content:
-        application/json:
-          schema:
-            allOf:
-              - $ref: "#/components/schemas/SuccessEnvelope"
-              - type: object
-                properties:
-                  data:
-                    type: object
-                    properties:
-                      announcement: { $ref: "#/components/schemas/Announcement" }
-    AttendanceSlotResponse:
-      description: A teaching slot
-      content:
-        application/json:
-          schema:
-            allOf:
-              - $ref: "#/components/schemas/SuccessEnvelope"
-              - type: object
-                properties:
-                  data:
-                    type: object
-                    properties:
-                      slot: { $ref: "#/components/schemas/AttendanceSlot" }
-    AttendanceResponse:
-      description: An attendance record
-      content:
-        application/json:
-          schema:
-            allOf:
-              - $ref: "#/components/schemas/SuccessEnvelope"
-              - type: object
-                properties:
-                  data:
-                    type: object
-                    properties:
-                      attendance: { $ref: "#/components/schemas/Attendance" }
-    GradeResponse:
-      description: A grade
-      content:
-        application/json:
-          schema:
-            allOf:
-              - $ref: "#/components/schemas/SuccessEnvelope"
-              - type: object
-                properties:
-                  data:
-                    type: object
-                    properties:
-                      grade: { $ref: "#/components/schemas/Grade" }
-    GradeSessionResponse:
-      description: A grade session
-      content:
-        application/json:
-          schema:
-            allOf:
-              - $ref: "#/components/schemas/SuccessEnvelope"
-              - type: object
-                properties:
-                  data:
-                    type: object
-                    properties:
-                      session: { $ref: "#/components/schemas/GradeSession" }
-    AnnualResultResponse:
-      description: An annual result
-      content:
-        application/json:
-          schema:
-            allOf:
-              - $ref: "#/components/schemas/SuccessEnvelope"
-              - type: object
-                properties:
-                  data:
-                    type: object
-                    properties:
-                      result: { $ref: "#/components/schemas/AnnualResult" }
-
+            $ref: '#/components/schemas/ErrorResponse'
   schemas:
-    SuccessEnvelope:
-      type: object
-      properties:
-        status: { type: string, example: success }
-        message: { type: string }
-        results: { type: integer, description: Number of items of a list }
-        data: { type: object }
-
-    ErrorResponse:
-      type: object
-      properties:
-        status: { type: string, enum: [fail, error] }
-        message: { type: string }
-        errors:
-          type: array
-          items:
-            type: object
-            properties:
-              field: { type: string }
-              message: { type: string }
-
-    UserRole: { type: string, enum: [ADMIN, TEACHER, SECRETARY, STUDENT] }
-    Gender: { type: string, enum: [MALE, FEMALE] }
-    ClassGroup: { type: string, enum: [SECONDE, PREMIERE, TERMINALE, ANCIEN] }
-    DayOfWeek: { type: string, enum: [MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY] }
-    ExamType: { type: string, enum: [SEMI_TRIMESTER, TRIMESTER] }
-    Term: { type: string, enum: [FIRST_TRIMESTER, SECOND_TRIMESTER, THIRD_TRIMESTER] }
-    GradeStatus: { type: string, enum: [DRAFT, PENDING, PUBLISHED] }
-    GradeSessionStatus: { type: string, enum: [OPEN, PENDING_REVIEW, VALIDATED] }
-    ResultStatus: { type: string, enum: [DRAFT, APPROVED, PUBLISHED] }
-    AcademicDecision: { type: string, enum: [PROMOTE, REPEAT, ORIENTED, PENDING] }
-    HistoryType: { type: string, enum: [ABSENCE, LATENESS, SUSPENSION, INFIRMARY, EARLY_LEAVE_PERMIT] }
-    RemarkCategory: { type: string, enum: [BEHAVIOR, ACADEMIC, WARNING, ENCOURAGEMENT, OTHER] }
-    AttendanceStatus: { type: string, enum: [PRESENT, LATE, ABSENT] }
-
+    UserRole:
+      type: string
+      enum:
+        - ADMIN
+        - TEACHER
+        - SECRETARY
+        - STUDENT
+    ClassGroup:
+      type: string
+      enum:
+        - SECONDE
+        - PREMIERE
+        - TERMINALE
+        - ANCIEN
+    Gender:
+      type: string
+      enum:
+        - MALE
+        - FEMALE
+    ExamType:
+      type: string
+      enum:
+        - SEMI_TRIMESTER
+        - TRIMESTER
+    Term:
+      type: string
+      enum:
+        - FIRST_TRIMESTER
+        - SECOND_TRIMESTER
+        - THIRD_TRIMESTER
+    GradeStatus:
+      type: string
+      enum:
+        - DRAFT
+        - PENDING
+        - PUBLISHED
+    GradeSessionStatus:
+      type: string
+      enum:
+        - OPEN
+        - PENDING_REVIEW
+        - VALIDATED
+    ResultStatus:
+      type: string
+      enum:
+        - DRAFT
+        - APPROVED
+        - PUBLISHED
+    AcademicDecision:
+      type: string
+      enum:
+        - PROMOTE
+        - REPEAT
+        - ORIENTED
+        - PENDING
+    HistoryType:
+      type: string
+      enum:
+        - ABSENCE
+        - LATENESS
+        - SUSPENSION
+        - INFIRMARY
+        - EARLY_LEAVE_PERMIT
+    RemarkCategory:
+      type: string
+      enum:
+        - BEHAVIOR
+        - ACADEMIC
+        - WARNING
+        - ENCOURAGEMENT
+        - OTHER
+    DayOfWeek:
+      type: string
+      enum:
+        - MONDAY
+        - TUESDAY
+        - WEDNESDAY
+        - THURSDAY
+        - FRIDAY
+        - SATURDAY
+    TargetScope:
+      type: string
+      enum:
+        - ALL
+        - CLASS
+    AnnouncementPriority:
+      type: string
+      enum:
+        - NORMAL
+        - URGENT
+    AttendanceStatus:
+      type: string
+      enum:
+        - PRESENT
+        - LATE
+        - ABSENT
     LoginRequest:
       type: object
-      required: [email, matricule]
+      additionalProperties: false
+      required:
+        - email
+        - matricule
       properties:
-        email: { type: string, format: email }
-        matricule: { type: string, description: Matricule of the account (acts as the password) }
-
-    LoginResult:
+        email:
+          type: string
+          format: email
+        matricule:
+          type: string
+          minLength: 1
+          description: The matricule is the password of every account
+    LoginUser:
       type: object
       properties:
-        token: { type: string }
-        redirectUrl: { type: string, example: /dashboard }
-        user:
-          type: object
-          properties:
-            id: { type: string, format: uuid }
-            firstName: { type: string }
-            lastName: { type: string }
-            email: { type: string, format: email }
-            role: { $ref: "#/components/schemas/UserRole" }
-            profilePictureUrl: { type: string, nullable: true }
-
+        id:
+          type: string
+          format: uuid
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+        role:
+          $ref: '#/components/schemas/UserRole'
+        profilePictureUrl:
+          type: string
+          nullable: true
     User:
       type: object
-      description: Common fields plus the details of the role (student, teacher or secretary fields are null for the other roles).
       properties:
-        id: { type: string, format: uuid }
-        firstName: { type: string }
-        lastName: { type: string }
-        email: { type: string, format: email, nullable: true }
-        matricule: { type: string }
-        role: { $ref: "#/components/schemas/UserRole" }
-        gender: { $ref: "#/components/schemas/Gender" }
-        contactNumber: { type: string }
-        profilePictureUrl: { type: string, nullable: true }
-        createdAt: { type: string, format: date-time }
-        classRollNumber: { type: integer, nullable: true }
-        classGroup: { allOf: [{ $ref: "#/components/schemas/ClassGroup" }], nullable: true }
-        dateOfBirth: { type: string, format: date, nullable: true }
-        address: { type: string, nullable: true }
-        parentsEmail: { type: string, nullable: true }
-        parentsContactNumber: { type: string, nullable: true }
-        entryYear: { type: integer, nullable: true }
-        graduationYear: { type: integer, nullable: true }
-        comments: { type: string, nullable: true }
-        isActive: { type: boolean, nullable: true, description: Only for students }
-        homeroomClass: { type: string, nullable: true, description: Only for teachers }
-        department: { type: string, nullable: true, description: Only for secretaries }
-
-    BaseUserFields:
-      type: object
-      required: [firstName, lastName, matricule, gender]
-      properties:
-        firstName: { type: string, minLength: 2 }
-        lastName: { type: string, minLength: 2 }
-        matricule: { type: string, minLength: 2 }
-        gender: { $ref: "#/components/schemas/Gender" }
-        email: { type: string, format: email }
-        contactNumber: { type: string }
-        profilePictureUrl: { type: string }
-
+        id:
+          type: string
+          format: uuid
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          nullable: true
+        contactNumber:
+          type: string
+        profilePictureUrl:
+          type: string
+          nullable: true
+        role:
+          $ref: '#/components/schemas/UserRole'
+        matricule:
+          type: string
+        gender:
+          $ref: '#/components/schemas/Gender'
+        isSuperAdmin:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        classRollNumber:
+          type: integer
+        classGroup:
+          $ref: '#/components/schemas/ClassGroup'
+        dateOfBirth:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        parentsEmail:
+          type: string
+          nullable: true
+        parentsContactNumber:
+          type: string
+          nullable: true
+        entryYear:
+          type: integer
+        graduationYear:
+          type: integer
+          nullable: true
+        comments:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+        homeroomClass:
+          $ref: '#/components/schemas/ClassGroup'
+        department:
+          type: string
+          nullable: true
     CreateAdministratorRequest:
-      allOf:
-        - $ref: "#/components/schemas/BaseUserFields"
-
-    CreateSecretaryRequest:
-      allOf:
-        - $ref: "#/components/schemas/BaseUserFields"
-        - type: object
-          properties:
-            department: { type: string }
-
-    CreateTeacherRequest:
-      allOf:
-        - $ref: "#/components/schemas/BaseUserFields"
-        - type: object
-          properties:
-            homeroomClass: { type: string }
-
+      type: object
+      additionalProperties: false
+      required:
+        - firstName
+        - lastName
+        - matricule
+        - gender
+      properties:
+        firstName:
+          type: string
+          minLength: 2
+        lastName:
+          type: string
+          minLength: 2
+        matricule:
+          type: string
+          minLength: 2
+        gender:
+          $ref: '#/components/schemas/Gender'
+        profilePictureUrl:
+          type: string
     CreateStudentRequest:
-      allOf:
-        - $ref: "#/components/schemas/BaseUserFields"
-        - type: object
-          required: [classRollNumber, classGroup]
-          properties:
-            classRollNumber: { type: integer, minimum: 1 }
-            classGroup: { $ref: "#/components/schemas/ClassGroup" }
-            dateOfBirth: { type: string, format: date }
-            address: { type: string }
-            parentsEmail: { type: string, format: email }
-            parentsContactNumber: { type: string }
-            entryYear: { type: integer }
-            graduationYear: { type: integer }
-            comments: { type: string }
-
+      type: object
+      additionalProperties: false
+      required:
+        - firstName
+        - lastName
+        - matricule
+        - gender
+        - classRollNumber
+        - classGroup
+      properties:
+        firstName:
+          type: string
+          minLength: 2
+        lastName:
+          type: string
+          minLength: 2
+        matricule:
+          type: string
+          minLength: 2
+        gender:
+          $ref: '#/components/schemas/Gender'
+        profilePictureUrl:
+          type: string
+        classRollNumber:
+          type: integer
+          minimum: 1
+        classGroup:
+          $ref: '#/components/schemas/ClassGroup'
+        dateOfBirth:
+          type: string
+          pattern: ^\d{4}-\d{2}-\d{2}(T[0-9:.+\-Z]+)?$
+          example: '2026-11-21'
+        address:
+          type: string
+        parentsEmail:
+          type: string
+          format: email
+        parentsContactNumber:
+          type: string
+        entryYear:
+          type: integer
+        graduationYear:
+          type: integer
+        comments:
+          type: string
+    CreateSecretaryRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - firstName
+        - lastName
+        - matricule
+        - gender
+      properties:
+        firstName:
+          type: string
+          minLength: 2
+        lastName:
+          type: string
+          minLength: 2
+        matricule:
+          type: string
+          minLength: 2
+        gender:
+          $ref: '#/components/schemas/Gender'
+        profilePictureUrl:
+          type: string
+        department:
+          type: string
+    CreateTeacherRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - firstName
+        - lastName
+        - matricule
+        - gender
+      properties:
+        firstName:
+          type: string
+          minLength: 2
+        lastName:
+          type: string
+          minLength: 2
+        matricule:
+          type: string
+          minLength: 2
+        gender:
+          $ref: '#/components/schemas/Gender'
+        profilePictureUrl:
+          type: string
+        homeroomClass:
+          $ref: '#/components/schemas/ClassGroup'
     UpdateUserRequest:
       type: object
-      description: Any subset of the creation fields of the role, plus `password` and (students) `isActive`. Unknown fields are ignored.
+      additionalProperties: false
       properties:
-        firstName: { type: string }
-        lastName: { type: string }
-        matricule: { type: string }
-        password: { type: string, minLength: 8 }
-        email: { type: string, format: email }
-        gender: { $ref: "#/components/schemas/Gender" }
-        contactNumber: { type: string }
-        profilePictureUrl: { type: string }
-        classRollNumber: { type: integer }
-        classGroup: { $ref: "#/components/schemas/ClassGroup" }
-        dateOfBirth: { type: string, format: date }
-        address: { type: string }
-        parentsEmail: { type: string, format: email }
-        parentsContactNumber: { type: string }
-        entryYear: { type: integer }
-        graduationYear: { type: integer }
-        comments: { type: string }
-        isActive: { type: boolean }
-        homeroomClass: { type: string }
-        department: { type: string }
-
+        firstName:
+          type: string
+          minLength: 2
+        lastName:
+          type: string
+          minLength: 2
+        matricule:
+          type: string
+          minLength: 2
+        password:
+          type: string
+          minLength: 8
+        email:
+          type: string
+          format: email
+        contactNumber:
+          type: string
+        profilePictureUrl:
+          type: string
+        gender:
+          $ref: '#/components/schemas/Gender'
+        classRollNumber:
+          type: integer
+          minimum: 1
+        classGroup:
+          $ref: '#/components/schemas/ClassGroup'
+        entryYear:
+          type: integer
+        dateOfBirth:
+          type: string
+          pattern: ^\d{4}-\d{2}-\d{2}(T[0-9:.+\-Z]+)?$
+          example: '2026-11-21'
+        address:
+          type: string
+        parentsEmail:
+          type: string
+          format: email
+        parentsContactNumber:
+          type: string
+        comments:
+          type: string
+        graduationYear:
+          type: integer
+        isActive:
+          type: boolean
+        homeroomClass:
+          $ref: '#/components/schemas/ClassGroup'
+        department:
+          type: string
     SubjectAssignment:
       type: object
-      required: [classGroup, teacherId]
+      additionalProperties: false
+      required:
+        - classGroup
+        - teacherId
       properties:
-        classGroup: { $ref: "#/components/schemas/ClassGroup" }
-        teacherId: { type: string, format: uuid }
-        teacherFirstName: { type: string, readOnly: true }
-        teacherLastName: { type: string, readOnly: true }
-
+        classGroup:
+          $ref: '#/components/schemas/ClassGroup'
+        teacherId:
+          type: string
+          format: uuid
+        teacherFirstName:
+          type: string
+        teacherLastName:
+          type: string
     Subject:
       type: object
       properties:
-        id: { type: string, format: uuid }
-        name: { type: string }
-        coefficient: { type: number }
-        description: { type: string, nullable: true }
-        isActive: { type: boolean }
-        createdAt: { type: string, format: date-time }
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        coefficient:
+          type: number
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
         assignments:
           type: array
-          items: { $ref: "#/components/schemas/SubjectAssignment" }
-
+          items:
+            $ref: '#/components/schemas/SubjectAssignment'
     CreateSubjectRequest:
       type: object
-      required: [name, coefficient, assignments]
+      additionalProperties: false
+      required:
+        - name
+        - coefficient
+        - assignments
       properties:
-        name: { type: string, minLength: 2 }
-        coefficient: { type: number, exclusiveMinimum: true, minimum: 0 }
-        description: { type: string }
+        name:
+          type: string
+          minLength: 2
+        coefficient:
+          type: number
+          minimum: 0.1
+          maximum: 99.9
         assignments:
           type: array
           minItems: 1
-          items: { $ref: "#/components/schemas/SubjectAssignment" }
-
+          items:
+            $ref: '#/components/schemas/SubjectAssignment'
     UpdateSubjectRequest:
       type: object
+      additionalProperties: false
       properties:
-        name: { type: string, minLength: 2 }
-        coefficient: { type: number, exclusiveMinimum: true, minimum: 0 }
-        description: { type: string }
+        name:
+          type: string
+          minLength: 2
+        coefficient:
+          type: number
+          minimum: 0.1
+          maximum: 99.9
         assignments:
           type: array
           minItems: 1
-          description: Replaces every existing assignment
-          items: { $ref: "#/components/schemas/SubjectAssignment" }
-
+          items:
+            $ref: '#/components/schemas/SubjectAssignment'
     Announcement:
       type: object
       properties:
-        id: { type: string, format: uuid }
-        title: { type: string }
-        content: { type: string }
-        authorId: { type: string, format: uuid }
-        authorFirstName: { type: string }
-        authorLastName: { type: string }
-        targetScope: { type: string, enum: [ALL, CLASS] }
-        targetValue: { type: string, nullable: true }
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        content:
+          type: string
+        authorId:
+          type: string
+          format: uuid
+        authorFirstName:
+          type: string
+        authorLastName:
+          type: string
+        targetScope:
+          $ref: '#/components/schemas/TargetScope'
+        targetValue:
+          type: string
+          nullable: true
         targetClasses:
           type: array
-          items: { $ref: "#/components/schemas/ClassGroup" }
-        priority: { type: string, enum: [NORMAL, URGENT] }
-        createdAt: { type: string, format: date-time }
-        updatedAt: { type: string, format: date-time }
-
+          items:
+            $ref: '#/components/schemas/ClassGroup'
+        priority:
+          $ref: '#/components/schemas/AnnouncementPriority'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
     CreateAnnouncementRequest:
       type: object
-      required: [title, content, targetScope]
+      additionalProperties: false
+      required:
+        - title
+        - content
+        - targetScope
+      description: A targetScope of CLASS requires at least one target class.
       properties:
-        title: { type: string, minLength: 3 }
-        content: { type: string, minLength: 10 }
-        targetScope: { type: string, enum: [ALL, CLASS] }
+        title:
+          type: string
+          minLength: 3
+        content:
+          type: string
+          minLength: 10
+        targetScope:
+          $ref: '#/components/schemas/TargetScope'
+        targetValue:
+          type: string
+          nullable: true
+        priority:
+          $ref: '#/components/schemas/AnnouncementPriority'
+          default: NORMAL
         targetClasses:
           type: array
-          description: Required (at least one) when targetScope is CLASS
-          items: { $ref: "#/components/schemas/ClassGroup" }
-        targetValue: { type: string, nullable: true }
-        priority: { type: string, enum: [NORMAL, URGENT], default: NORMAL }
-
+          items:
+            $ref: '#/components/schemas/ClassGroup'
     UpdateAnnouncementRequest:
       type: object
+      additionalProperties: false
       properties:
-        title: { type: string, minLength: 3 }
-        content: { type: string, minLength: 10 }
-        targetScope: { type: string, enum: [ALL, CLASS] }
+        title:
+          type: string
+          minLength: 3
+        content:
+          type: string
+          minLength: 10
+        targetScope:
+          $ref: '#/components/schemas/TargetScope'
+        targetValue:
+          type: string
+          nullable: true
+        priority:
+          $ref: '#/components/schemas/AnnouncementPriority'
         targetClasses:
           type: array
-          items: { $ref: "#/components/schemas/ClassGroup" }
-        targetValue: { type: string, nullable: true }
-        priority: { type: string, enum: [NORMAL, URGENT] }
-
-    StudentHistoryRecord:
+          items:
+            $ref: '#/components/schemas/ClassGroup'
+    HistoryRecord:
       type: object
       properties:
-        id: { type: string, format: uuid }
-        studentId: { type: string, format: uuid }
-        type: { $ref: "#/components/schemas/HistoryType" }
-        startDate: { type: string, format: date-time }
-        endDate: { type: string, format: date-time }
-        reason: { type: string }
-        createdByAdminId: { type: string, format: uuid }
-        createdAt: { type: string, format: date-time }
-        updatedAt: { type: string, format: date-time }
-
-    CreateStudentHistoryRequest:
+        id:
+          type: string
+          format: uuid
+        studentId:
+          type: string
+          format: uuid
+        type:
+          $ref: '#/components/schemas/HistoryType'
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        reason:
+          type: string
+        createdByAdminId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateHistoryRecordRequest:
       type: object
-      required: [studentId, type, startDate, endDate, reason]
+      additionalProperties: false
+      required:
+        - studentId
+        - type
+        - startDate
+        - endDate
+        - reason
       properties:
-        studentId: { type: string, format: uuid }
-        type: { $ref: "#/components/schemas/HistoryType" }
-        startDate: { type: string, format: date }
-        endDate: { type: string, format: date, description: Must not be before startDate }
-        reason: { type: string, minLength: 3 }
-
-    UpdateStudentHistoryRequest:
+        studentId:
+          type: string
+          format: uuid
+        type:
+          $ref: '#/components/schemas/HistoryType'
+        startDate:
+          type: string
+          pattern: ^\d{4}-\d{2}-\d{2}(T[0-9:.+\-Z]+)?$
+          example: '2026-11-21'
+        endDate:
+          type: string
+          pattern: ^\d{4}-\d{2}-\d{2}(T[0-9:.+\-Z]+)?$
+          example: '2026-11-21'
+        reason:
+          type: string
+          minLength: 3
+    UpdateHistoryRecordRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          $ref: '#/components/schemas/HistoryType'
+        startDate:
+          type: string
+          pattern: ^\d{4}-\d{2}-\d{2}(T[0-9:.+\-Z]+)?$
+          example: '2026-11-21'
+        endDate:
+          type: string
+          pattern: ^\d{4}-\d{2}-\d{2}(T[0-9:.+\-Z]+)?$
+          example: '2026-11-21'
+        reason:
+          type: string
+          minLength: 3
+    Remark:
       type: object
       properties:
-        type: { $ref: "#/components/schemas/HistoryType" }
-        startDate: { type: string, format: date }
-        endDate: { type: string, format: date }
-        reason: { type: string, minLength: 3 }
-
-    StudentRemark:
+        id:
+          type: string
+          format: uuid
+        studentId:
+          type: string
+          format: uuid
+        authorId:
+          type: string
+          format: uuid
+        authorRole:
+          $ref: '#/components/schemas/UserRole'
+        category:
+          $ref: '#/components/schemas/RemarkCategory'
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateRemarkRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - studentId
+        - category
+        - content
+      properties:
+        studentId:
+          type: string
+          format: uuid
+        category:
+          $ref: '#/components/schemas/RemarkCategory'
+        content:
+          type: string
+          minLength: 5
+    UpdateRemarkRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        category:
+          $ref: '#/components/schemas/RemarkCategory'
+        content:
+          type: string
+          minLength: 5
+    AttendanceSlot:
       type: object
       properties:
-        id: { type: string, format: uuid }
-        studentId: { type: string, format: uuid }
-        authorId: { type: string, format: uuid }
-        authorRole: { $ref: "#/components/schemas/UserRole" }
-        category: { $ref: "#/components/schemas/RemarkCategory" }
-        content: { type: string }
-        createdAt: { type: string, format: date-time }
-        updatedAt: { type: string, format: date-time }
-
-    CreateStudentRemarkRequest:
+        id:
+          type: string
+          format: uuid
+        teacherId:
+          type: string
+          format: uuid
+        subjectId:
+          type: string
+          format: uuid
+        targetClass:
+          $ref: '#/components/schemas/ClassGroup'
+        dayOfWeek:
+          $ref: '#/components/schemas/DayOfWeek'
+        startTime:
+          type: string
+          example: '08:00:00'
+        endTime:
+          type: string
+          example: '10:00:00'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateAttendanceSlotRequest:
       type: object
-      required: [studentId, category, content]
+      additionalProperties: false
+      required:
+        - teacherId
+        - subjectId
+        - targetClass
+        - dayOfWeek
+        - startTime
+        - endTime
       properties:
-        studentId: { type: string, format: uuid }
-        category: { $ref: "#/components/schemas/RemarkCategory" }
-        content: { type: string, minLength: 5 }
-
-    UpdateStudentRemarkRequest:
-      type: object
-      properties:
-        category: { $ref: "#/components/schemas/RemarkCategory" }
-        content: { type: string, minLength: 5 }
-
-    AttendanceSlotRequest:
-      type: object
-      required: [teacherId, subjectId, targetClass, dayOfWeek, startTime, endTime, classroom]
-      properties:
-        teacherId: { type: string, format: uuid }
-        subjectId: { type: string, format: uuid }
-        targetClass: { $ref: "#/components/schemas/ClassGroup" }
-        dayOfWeek: { $ref: "#/components/schemas/DayOfWeek" }
-        startTime: { type: string, example: "08:00" }
-        endTime: { type: string, example: "10:00", description: Must be after startTime }
-        classroom: { type: string }
-
+        teacherId:
+          type: string
+          format: uuid
+        subjectId:
+          type: string
+          format: uuid
+        targetClass:
+          $ref: '#/components/schemas/ClassGroup'
+        dayOfWeek:
+          $ref: '#/components/schemas/DayOfWeek'
+        startTime:
+          type: string
+          pattern: ^([01]\d|2[0-3]):([0-5]\d)(:[0-5]\d)?$
+          example: '08:00'
+        endTime:
+          type: string
+          pattern: ^([01]\d|2[0-3]):([0-5]\d)(:[0-5]\d)?$
+          example: '08:00'
     UpdateAttendanceSlotRequest:
       type: object
-      description: Any subset of the slot fields
+      additionalProperties: false
       properties:
-        teacherId: { type: string, format: uuid }
-        subjectId: { type: string, format: uuid }
-        targetClass: { $ref: "#/components/schemas/ClassGroup" }
-        dayOfWeek: { $ref: "#/components/schemas/DayOfWeek" }
-        startTime: { type: string, example: "08:00" }
-        endTime: { type: string, example: "10:00" }
-        classroom: { type: string }
-
-    AttendanceSlot:
-      allOf:
-        - $ref: "#/components/schemas/AttendanceSlotRequest"
-        - type: object
-          properties:
-            id: { type: string, format: uuid }
-            createdAt: { type: string, format: date-time }
-            updatedAt: { type: string, format: date-time }
-
-    CheckAttendanceRequest:
-      type: object
-      required: [slotId, attendanceDate]
-      properties:
-        slotId: { type: string, format: uuid }
-        attendanceDate: { type: string, format: date }
-
-    MarkAbsenceRequest:
-      type: object
-      required: [slotId, attendanceDate]
-      properties:
-        slotId: { type: string, format: uuid }
-        attendanceDate: { type: string, format: date }
-        motif: { type: string }
-
-    UpdateAttendanceMotifRequest:
-      type: object
-      required: [attendanceDate, motif]
-      properties:
-        attendanceDate: { type: string, format: date }
-        motif: { type: string }
-
+        teacherId:
+          type: string
+          format: uuid
+        subjectId:
+          type: string
+          format: uuid
+        targetClass:
+          $ref: '#/components/schemas/ClassGroup'
+        dayOfWeek:
+          $ref: '#/components/schemas/DayOfWeek'
+        startTime:
+          type: string
+          pattern: ^([01]\d|2[0-3]):([0-5]\d)(:[0-5]\d)?$
+          example: '08:00'
+        endTime:
+          type: string
+          pattern: ^([01]\d|2[0-3]):([0-5]\d)(:[0-5]\d)?$
+          example: '08:00'
     Attendance:
       type: object
       properties:
-        id: { type: string, format: uuid }
-        slotId: { type: string, format: uuid }
-        attendanceDate: { type: string, format: date }
-        status: { $ref: "#/components/schemas/AttendanceStatus" }
-        actualCheckInTime: { type: string, format: date-time, nullable: true }
-        lateDurationMinutes: { type: integer }
-        motif: { type: string, nullable: true }
-        recordedBy: { type: string, format: uuid }
-
+        id:
+          type: string
+          format: uuid
+        slotId:
+          type: string
+          format: uuid
+        attendanceDate:
+          type: string
+          example: '2026-11-21'
+        status:
+          $ref: '#/components/schemas/AttendanceStatus'
+        actualCheckInTime:
+          type: string
+          format: date-time
+          nullable: true
+        lateDurationMinutes:
+          type: integer
+        motif:
+          type: string
+          nullable: true
+        recordedBy:
+          type: string
+          format: uuid
     AttendanceCard:
       type: object
       properties:
-        slotId: { type: string, format: uuid }
-        attendanceId: { type: string, format: uuid, nullable: true }
-        teacherId: { type: string, format: uuid }
-        teacherFirstName: { type: string }
-        teacherLastName: { type: string }
-        subjectId: { type: string, format: uuid }
-        subjectName: { type: string }
-        targetClass: { $ref: "#/components/schemas/ClassGroup" }
-        classroom: { type: string }
-        dayOfWeek: { $ref: "#/components/schemas/DayOfWeek" }
-        startTime: { type: string, example: "08:00:00" }
-        endTime: { type: string, example: "10:00:00" }
-        attendanceDate: { type: string, format: date }
+        slotId:
+          type: string
+          format: uuid
+        attendanceId:
+          type: string
+          format: uuid
+          nullable: true
+        teacherId:
+          type: string
+          format: uuid
+        teacherFirstName:
+          type: string
+        teacherLastName:
+          type: string
+        subjectId:
+          type: string
+          format: uuid
+        subjectName:
+          type: string
+        targetClass:
+          $ref: '#/components/schemas/ClassGroup'
+        dayOfWeek:
+          $ref: '#/components/schemas/DayOfWeek'
+        startTime:
+          type: string
+        endTime:
+          type: string
+        attendanceDate:
+          type: string
         status:
           type: string
-          enum: [PENDING, PRESENT, LATE, ABSENT]
-        actualCheckInTime: { type: string, format: date-time, nullable: true }
-        lateDurationMinutes: { type: integer }
-        motif: { type: string, nullable: true }
-
+          enum:
+            - PRESENT
+            - LATE
+            - ABSENT
+            - PENDING
+        actualCheckInTime:
+          type: string
+          format: date-time
+          nullable: true
+        lateDurationMinutes:
+          type: integer
+        motif:
+          type: string
+          nullable: true
     AttendanceSummary:
       type: object
       properties:
-        teacherId: { type: string, format: uuid }
-        teacherFirstName: { type: string }
-        teacherLastName: { type: string }
-        subjectId: { type: string, format: uuid }
-        subjectName: { type: string }
-        targetClass: { $ref: "#/components/schemas/ClassGroup" }
-        status: { type: string, enum: [LATE, ABSENT] }
-        occurrenceCount: { type: integer }
-        totalLateMinutes: { type: integer }
+        teacherId:
+          type: string
+          format: uuid
+        teacherFirstName:
+          type: string
+        teacherLastName:
+          type: string
+        subjectId:
+          type: string
+          format: uuid
+        subjectName:
+          type: string
+        targetClass:
+          $ref: '#/components/schemas/ClassGroup'
+        status:
+          $ref: '#/components/schemas/AttendanceStatus'
+        occurrenceCount:
+          type: integer
+        totalLateMinutes:
+          type: integer
         motifs:
           type: array
           items:
             type: object
             properties:
-              attendanceDate: { type: string, format: date }
-              motif: { type: string }
-
+              attendanceDate:
+                type: string
+              motif:
+                type: string
+    CheckAttendanceRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - slotId
+        - attendanceDate
+      properties:
+        slotId:
+          type: string
+          format: uuid
+        attendanceDate:
+          type: string
+          format: date
+          example: '2026-11-21'
+    MarkAbsenceRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - slotId
+        - attendanceDate
+      properties:
+        slotId:
+          type: string
+          format: uuid
+        attendanceDate:
+          type: string
+          format: date
+          example: '2026-11-21'
+        motif:
+          type: string
+          minLength: 1
+    UpdateAttendanceMotifRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - attendanceDate
+        - motif
+      properties:
+        attendanceDate:
+          type: string
+          format: date
+          example: '2026-11-21'
+        motif:
+          type: string
+          minLength: 1
     Grade:
       type: object
       properties:
-        id: { type: string, format: uuid }
-        studentId: { type: string, format: uuid }
-        subjectId: { type: string, format: uuid }
-        classGroup: { $ref: "#/components/schemas/ClassGroup" }
-        examType: { $ref: "#/components/schemas/ExamType" }
-        term: { $ref: "#/components/schemas/Term" }
-        value: { type: number }
-        maxScore: { type: number }
-        status: { $ref: "#/components/schemas/GradeStatus" }
-        sessionId: { type: string, format: uuid, nullable: true }
-        createdBySecretaryId: { type: string, format: uuid }
-        approvedByAdminId: { type: string, format: uuid, nullable: true }
-        evaluationDate: { type: string, format: date-time }
-        createdAt: { type: string, format: date-time }
-        updatedAt: { type: string, format: date-time }
-
+        id:
+          type: string
+          format: uuid
+        studentId:
+          type: string
+          format: uuid
+        subjectId:
+          type: string
+          format: uuid
+        classGroup:
+          $ref: '#/components/schemas/ClassGroup'
+        createdBySecretaryId:
+          type: string
+          format: uuid
+        approvedByAdminId:
+          type: string
+          format: uuid
+          nullable: true
+        examType:
+          $ref: '#/components/schemas/ExamType'
+        term:
+          $ref: '#/components/schemas/Term'
+        value:
+          type: number
+          description: Grade out of 20
+        status:
+          $ref: '#/components/schemas/GradeStatus'
+        sessionId:
+          type: string
+          format: uuid
+          nullable: true
+        evaluationDate:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
     CreateGradeRequest:
       type: object
-      required: [studentId, subjectId, classGroup, examType, term, value, evaluationDate]
+      additionalProperties: false
+      required:
+        - studentId
+        - subjectId
+        - classGroup
+        - examType
+        - term
+        - value
+        - evaluationDate
       properties:
-        studentId: { type: string, format: uuid }
-        subjectId: { type: string, format: uuid }
-        classGroup: { $ref: "#/components/schemas/ClassGroup" }
-        examType: { $ref: "#/components/schemas/ExamType" }
-        term: { $ref: "#/components/schemas/Term" }
-        value: { type: number, minimum: 0, description: Cannot exceed maxScore }
-        maxScore: { type: number, default: 20 }
-        evaluationDate: { type: string, format: date }
-
+        studentId:
+          type: string
+          format: uuid
+        subjectId:
+          type: string
+          format: uuid
+        classGroup:
+          $ref: '#/components/schemas/ClassGroup'
+        examType:
+          $ref: '#/components/schemas/ExamType'
+        term:
+          $ref: '#/components/schemas/Term'
+        value:
+          type: number
+          minimum: 0
+          maximum: 20
+        evaluationDate:
+          type: string
+          pattern: ^\d{4}-\d{2}-\d{2}(T[0-9:.+\-Z]+)?$
+          example: '2026-11-21'
     UpdateGradeRequest:
       type: object
+      additionalProperties: false
       properties:
-        value: { type: number, minimum: 0 }
-        maxScore: { type: number }
-        evaluationDate: { type: string, format: date }
-
-    SessionGradeEntry:
+        value:
+          type: number
+          minimum: 0
+          maximum: 20
+        evaluationDate:
+          type: string
+          pattern: ^\d{4}-\d{2}-\d{2}(T[0-9:.+\-Z]+)?$
+          example: '2026-11-21'
+    ReviewGradeRequest:
       type: object
-      required: [studentId, value]
+      additionalProperties: false
+      required:
+        - status
       properties:
-        studentId: { type: string, format: uuid }
-        value: { type: number, minimum: 0, description: Cannot exceed maxScore }
-        maxScore: { type: number, default: 20 }
-
-    SessionGradesRequest:
+        status:
+          $ref: '#/components/schemas/GradeStatus'
+    GradeSessionEntry:
       type: object
-      required: [grades]
+      additionalProperties: false
+      required:
+        - studentId
       properties:
-        grades:
-          type: array
-          description: At least one entry to submit; students must be active members of the session class, once each
-          items: { $ref: "#/components/schemas/SessionGradeEntry" }
-
-    CreateGradeSessionRequest:
+        studentId:
+          type: string
+          format: uuid
+        value:
+          type: number
+          nullable: true
+          minimum: 0
+          maximum: 20
+          description: Grade out of 20. A missing value marks the student as absent.
+    GradeSessionAbsence:
       type: object
-      required: [classGroup, subjectId, examType, term]
       properties:
-        classGroup: { $ref: "#/components/schemas/ClassGroup" }
-        subjectId: { type: string, format: uuid }
-        examType: { $ref: "#/components/schemas/ExamType" }
-        term: { $ref: "#/components/schemas/Term" }
-
+        studentId:
+          type: string
+          format: uuid
+        motif:
+          type: string
+          nullable: true
+        recordedAt:
+          type: string
+          format: date-time
     GradeSession:
       type: object
       properties:
-        id: { type: string, format: uuid }
-        classGroup: { $ref: "#/components/schemas/ClassGroup" }
-        subjectId: { type: string, format: uuid }
-        subjectName: { type: string }
-        examType: { $ref: "#/components/schemas/ExamType" }
-        term: { $ref: "#/components/schemas/Term" }
-        academicYear: { type: string, example: 2026-2027 }
-        status: { $ref: "#/components/schemas/GradeSessionStatus" }
+        id:
+          type: string
+          format: uuid
+        classGroup:
+          $ref: '#/components/schemas/ClassGroup'
+        subjectId:
+          type: string
+          format: uuid
+        subjectName:
+          type: string
+        subjectCoefficient:
+          type: number
+        examType:
+          $ref: '#/components/schemas/ExamType'
+        term:
+          $ref: '#/components/schemas/Term'
+        academicYear:
+          type: string
+          example: 2026-2027
+        status:
+          $ref: '#/components/schemas/GradeSessionStatus'
         draftGrades:
           type: array
-          items: { $ref: "#/components/schemas/SessionGradeEntry" }
-        createdByAdminId: { type: string, format: uuid }
-        submittedBySecretaryId: { type: string, format: uuid, nullable: true }
-        validatedByAdminId: { type: string, format: uuid, nullable: true }
-        createdAt: { type: string, format: date-time }
-        submittedAt: { type: string, format: date-time, nullable: true }
-        validatedAt: { type: string, format: date-time, nullable: true }
-
+          items:
+            $ref: '#/components/schemas/GradeSessionEntry'
+        absences:
+          type: array
+          items:
+            $ref: '#/components/schemas/GradeSessionAbsence'
+        createdByAdminId:
+          type: string
+          format: uuid
+        submittedBySecretaryId:
+          type: string
+          format: uuid
+          nullable: true
+        validatedByAdminId:
+          type: string
+          format: uuid
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        submittedAt:
+          type: string
+          format: date-time
+          nullable: true
+        validatedAt:
+          type: string
+          format: date-time
+          nullable: true
+    CreateGradeSessionRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - classGroup
+        - subjectId
+        - examType
+        - term
+      properties:
+        classGroup:
+          $ref: '#/components/schemas/ClassGroup'
+        subjectId:
+          type: string
+          format: uuid
+        examType:
+          $ref: '#/components/schemas/ExamType'
+        term:
+          $ref: '#/components/schemas/Term'
+    SaveGradeSessionRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - grades
+      properties:
+        grades:
+          type: array
+          items:
+            $ref: '#/components/schemas/GradeSessionEntry'
+    ReviseGradeSessionRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - grades
+      properties:
+        grades:
+          type: array
+          items:
+            $ref: '#/components/schemas/GradeSessionEntry'
+        absences:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - studentId
+              - motif
+            properties:
+              studentId:
+                type: string
+                format: uuid
+              motif:
+                type: string
+                minLength: 1
     SubjectBreakdown:
       type: object
-      required: [subjectId, subjectName, coefficient, subjectOverallAverage]
+      description: Every grade is the grade out of 20 multiplied by the coefficient of the subject. A missing grade is null and is not counted in the average.
       properties:
-        subjectId: { type: string, format: uuid }
-        subjectName: { type: string }
-        coefficient: { type: number }
-        term1SemiTrimesterGrade: { type: number, nullable: true }
-        term1TrimesterGrade: { type: number, nullable: true }
-        term2SemiTrimesterGrade: { type: number, nullable: true }
-        term2TrimesterGrade: { type: number, nullable: true }
-        term3SemiTrimesterGrade: { type: number, nullable: true }
-        term3TrimesterGrade: { type: number, nullable: true }
-        subjectOverallAverage: { type: number }
-
+        subjectId:
+          type: string
+          format: uuid
+        subjectName:
+          type: string
+        coefficient:
+          type: number
+        term1SemiTrimesterGrade:
+          type: number
+          nullable: true
+          minimum: 0
+        term1TrimesterGrade:
+          type: number
+          nullable: true
+          minimum: 0
+        term2SemiTrimesterGrade:
+          type: number
+          nullable: true
+          minimum: 0
+        term2TrimesterGrade:
+          type: number
+          nullable: true
+          minimum: 0
+        term3SemiTrimesterGrade:
+          type: number
+          nullable: true
+          minimum: 0
+        term3TrimesterGrade:
+          type: number
+          nullable: true
+          minimum: 0
+        subjectOverallAverage:
+          type: number
+          nullable: true
+          minimum: 0
     AnnualResult:
       type: object
       properties:
-        id: { type: string, format: uuid }
-        studentId: { type: string, format: uuid }
-        classGroup: { $ref: "#/components/schemas/ClassGroup" }
-        academicYear: { type: string, example: 2026-2027 }
-        status: { $ref: "#/components/schemas/ResultStatus" }
-        totalCoefficients: { type: number }
-        overallAverage: { type: number, description: Out of 20 }
-        decision: { $ref: "#/components/schemas/AcademicDecision" }
-        classRank: { type: integer, nullable: true }
-        pdfExportUrl: { type: string, nullable: true }
-        createdBySecretaryId: { type: string, format: uuid }
-        approvedByAdminId: { type: string, format: uuid, nullable: true }
+        id:
+          type: string
+          format: uuid
+        studentId:
+          type: string
+          format: uuid
+        classGroup:
+          $ref: '#/components/schemas/ClassGroup'
+        academicYear:
+          type: string
+        status:
+          $ref: '#/components/schemas/ResultStatus'
         subjects:
           type: array
-          items: { $ref: "#/components/schemas/SubjectBreakdown" }
-        createdAt: { type: string, format: date-time }
-        updatedAt: { type: string, format: date-time }
-
-    CreateAnnualResultRequest:
+          items:
+            $ref: '#/components/schemas/SubjectBreakdown'
+        totalCoefficients:
+          type: number
+        overallAverage:
+          type: number
+          description: Out of 20
+        decision:
+          $ref: '#/components/schemas/AcademicDecision'
+        classRank:
+          type: integer
+          nullable: true
+        createdBySecretaryId:
+          type: string
+          format: uuid
+        approvedByAdminId:
+          type: string
+          format: uuid
+          nullable: true
+        pdfExportUrl:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateResultRequest:
       type: object
-      required: [studentId, classGroup, academicYear, subjects, totalCoefficients, overallAverage]
+      additionalProperties: false
+      required:
+        - studentId
+        - classGroup
+        - academicYear
+        - subjects
+        - totalCoefficients
+        - overallAverage
       properties:
-        studentId: { type: string, format: uuid }
-        classGroup: { $ref: "#/components/schemas/ClassGroup" }
-        academicYear: { type: string, pattern: '^\d{4}-\d{4}$', example: 2026-2027 }
-        status: { $ref: "#/components/schemas/ResultStatus" }
+        studentId:
+          type: string
+          format: uuid
+        classGroup:
+          $ref: '#/components/schemas/ClassGroup'
+        academicYear:
+          type: string
+          pattern: ^\d{4}-\d{4}$
+        status:
+          $ref: '#/components/schemas/ResultStatus'
+          default: DRAFT
         subjects:
           type: array
           minItems: 1
-          items: { $ref: "#/components/schemas/SubjectBreakdown" }
-        totalCoefficients: { type: number }
-        overallAverage: { type: number }
-        decision: { $ref: "#/components/schemas/AcademicDecision" }
-        classRank: { type: integer }
-
-    UpdateAnnualResultRequest:
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - subjectId
+              - subjectName
+              - coefficient
+            properties:
+              subjectId:
+                type: string
+                format: uuid
+              subjectName:
+                type: string
+              coefficient:
+                type: number
+                minimum: 0.1
+              term1SemiTrimesterGrade:
+                type: number
+                nullable: true
+                minimum: 0
+              term1TrimesterGrade:
+                type: number
+                nullable: true
+                minimum: 0
+              term2SemiTrimesterGrade:
+                type: number
+                nullable: true
+                minimum: 0
+              term2TrimesterGrade:
+                type: number
+                nullable: true
+                minimum: 0
+              term3SemiTrimesterGrade:
+                type: number
+                nullable: true
+                minimum: 0
+              term3TrimesterGrade:
+                type: number
+                nullable: true
+                minimum: 0
+              subjectOverallAverage:
+                type: number
+                nullable: true
+                minimum: 0
+        totalCoefficients:
+          type: number
+          minimum: 0.1
+        overallAverage:
+          type: number
+          minimum: 0
+        decision:
+          $ref: '#/components/schemas/AcademicDecision'
+          default: PENDING
+        classRank:
+          type: integer
+          minimum: 1
+    ReviewResultRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        status:
+          $ref: '#/components/schemas/ResultStatus'
+        decision:
+          $ref: '#/components/schemas/AcademicDecision'
+    SuccessEnvelope:
       type: object
       properties:
-        status: { $ref: "#/components/schemas/ResultStatus" }
-        decision: { $ref: "#/components/schemas/AcademicDecision" }
+        status:
+          type: string
+          example: success
+        message:
+          type: string
+        results:
+          type: integer
+        data:
+          type: object
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - fail
+            - error
+        message:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
