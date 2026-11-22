@@ -4,7 +4,6 @@ build/
 .env
 .vscode/
 
-# generated report cards
 uploads/
 
 fichier.txt

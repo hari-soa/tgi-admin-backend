@@ -66,7 +66,7 @@ export const announcementRepository = {
           authorId,
           dto.targetScope,
           dto.targetValue || null,
-          dto.priority,
+          dto.priority ?? "NORMAL",
         ],
       );
       const announcementId: string = rows[0].id;
@@ -123,10 +123,6 @@ export const announcementRepository = {
     }
   },
 
-  /**
-   * With a class group, only the announcements for everyone or for that
-   * class are returned.
-   */
   findAll: async (visibleToClassGroup?: string): Promise<Announcement[]> => {
     const { rows } = await pool.query<Announcement>(
       `${ANNOUNCEMENT_SELECT}

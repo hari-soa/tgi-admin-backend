@@ -4,14 +4,14 @@ import { AuthenticatedRequest } from "../middlewares/authMiddleware";
 import { catchAsync } from "../utils/catchAsync";
 import {
   CreateAnnualResultDto,
-  UpdateAnnualResultDto,
+  ReviewAnnualResultDto,
 } from "../dtos/resultDto";
 
 type IdParams = { id: string };
 type StudentParams = { studentId: string };
 
 export const resultController = {
-  create: catchAsync(
+  createResult: catchAsync(
     async (
       req: AuthenticatedRequest<unknown, CreateAnnualResultDto>,
       res: Response,
@@ -28,7 +28,7 @@ export const resultController = {
     },
   ),
 
-  getById: catchAsync(
+  getResultById: catchAsync(
     async (
       req: AuthenticatedRequest<IdParams>,
       res: Response,
@@ -41,9 +41,9 @@ export const resultController = {
     },
   ),
 
-  review: catchAsync(
+  reviewResult: catchAsync(
     async (
-      req: AuthenticatedRequest<IdParams, UpdateAnnualResultDto>,
+      req: AuthenticatedRequest<IdParams, ReviewAnnualResultDto>,
       res: Response,
     ): Promise<void> => {
       const result = await resultService.reviewResult(
@@ -60,7 +60,7 @@ export const resultController = {
     },
   ),
 
-  getByStudent: catchAsync(
+  getStudentResults: catchAsync(
     async (
       req: AuthenticatedRequest<StudentParams>,
       res: Response,
@@ -77,7 +77,7 @@ export const resultController = {
     },
   ),
 
-  exportPdf: catchAsync(
+  exportResultPdf: catchAsync(
     async (
       req: AuthenticatedRequest<IdParams>,
       res: Response,

@@ -1,41 +1,47 @@
-import { Request, Response, NextFunction } from "express";
-import { ZodObject, ZodError } from "zod";
+import path from "path";
+import { OperationHandlerOptions } from "express-openapi-validator/dist/framework/types";
+import { OpenAPIV3 } from "express-openapi-validator/dist/framework/types";
+import { OpenApiValidatorOpts } from "express-openapi-validator/dist/openapi.validator";
+import * as OpenApiValidator from "express-openapi-validator";
+import { authenticateWithSpecification } from "./authMiddleware";
+import { operationHandlers } from "../utils/operationRegistry";
+import { specification } from "../utils/specification";
 
-/**
- * Validates body, query and params with a zod schema shaped as
- * { body?, query?, params? }. The parsed body (defaults applied, strings
- * trimmed, dates coerced) replaces req.body for the controllers.
- */
-export const validate = (schema: ZodObject) => {
-  return async (
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const parsed = (await schema.parseAsync({
-        body: req.body,
-        query: req.query,
-        params: req.params,
-      })) as { body?: unknown };
+const CONTROLLERS_DIRECTORY = path.join(__dirname, "../controllers");
 
-      if (parsed.body !== undefined) {
-        req.body = parsed.body;
-      }
-      next();
-    } catch (error) {
-      if (error instanceof ZodError) {
-        res.status(400).json({
-          status: "fail",
-          message: "Invalid input data",
-          errors: error.issues.map((issue) => ({
-            field: issue.path.filter((segment) => segment !== "body").join("."),
-            message: issue.message,
-          })),
-        });
-        return;
-      }
-      next(error);
-    }
-  };
+const resolveOperationHandler: OperationHandlerOptions["resolver"] = (
+  _controllersPath,
+  route,
+  apiDoc,
+) => {
+  const pathKey = route.openApiRoute.substring(route.basePath.length);
+  const operation = (apiDoc.paths?.[pathKey] as Record<string, OpenAPIV3.OperationObject>)[
+    route.method.toLowerCase()
+  ];
+  const operationId = operation.operationId ?? "";
+  const handler = operationHandlers[operationId];
+
+  if (!handler) {
+    throw new Error(`No controller handles the operation "${operationId}"`);
+  }
+  return handler;
 };
+
+export const createSpecificationMiddleware = () =>
+  OpenApiValidator.middleware({
+    apiSpec: specification as unknown as OpenApiValidatorOpts["apiSpec"],
+    validateApiSpec: true,
+    validateRequests: {
+      removeAdditional: true,
+      allowUnknownQueryParameters: false,
+      coerceTypes: true,
+    },
+    validateResponses: false,
+    validateSecurity: {
+      handlers: { bearerAuth: authenticateWithSpecification },
+    },
+    operationHandlers: {
+      basePath: CONTROLLERS_DIRECTORY,
+      resolver: resolveOperationHandler,
+    },
+  });

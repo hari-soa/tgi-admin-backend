@@ -3,17 +3,13 @@ export interface UpdateStatement {
   values: unknown[];
 }
 
-/**
- * Builds the "column = $n" list of an UPDATE query from the fields that are
- * actually present in `data`. Returns null when there is nothing to update.
- * The id used in the WHERE clause must be bound as `$${values.length + 1}`.
- */
 export const buildUpdateStatement = (
   columnMapping: Record<string, string>,
-  data: Record<string, unknown>,
+  data: object,
 ): UpdateStatement | null => {
+  const values = data as Record<string, unknown>;
   const presentEntries = Object.entries(columnMapping).filter(
-    ([propertyName]) => data[propertyName] !== undefined,
+    ([propertyName]) => values[propertyName] !== undefined,
   );
 
   if (presentEntries.length === 0) {
@@ -23,7 +19,7 @@ export const buildUpdateStatement = (
   const setClause = presentEntries
     .map(([, column], index) => `${column} = $${index + 1}`)
     .join(", ");
-  const values = presentEntries.map(([propertyName]) => data[propertyName]);
+  const selectedValues = presentEntries.map(([propertyName]) => values[propertyName]);
 
-  return { setClause, values };
+  return { setClause, values: selectedValues };
 };

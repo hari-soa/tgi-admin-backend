@@ -93,10 +93,6 @@ export const teacherAttendanceService = {
     return teacherAttendanceRepository.getDailyCards(dayOfWeek, attendanceDate);
   },
 
-  /**
-   * Records the arrival of a teacher. Lateness is computed against the
-   * school time zone and only when the attendance is recorded for today.
-   */
   checkAttendance: async (dto: CheckAttendanceDto, recordedBy: string) => {
     const slot = await assertSlotExists(dto.slotId);
 

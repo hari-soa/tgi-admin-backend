@@ -6,10 +6,6 @@ type AsyncHandler<TRequest extends Request> = (
   next: NextFunction,
 ) => Promise<void>;
 
-/**
- * Wraps an async controller so that any rejection is forwarded to the
- * global error handler. The request type stays specific at the call site.
- */
 export const catchAsync = <TRequest extends Request = Request>(
   handler: AsyncHandler<TRequest>,
 ): RequestHandler => {

@@ -1,34 +1,36 @@
 import bcrypt from "bcrypt";
-import { ZodObject } from "zod";
 import { userRepository, UserFilters } from "../repositories/userRepository";
 import {
   CreateAdministratorDto,
   CreateStudentDto,
   CreateSecretaryDto,
   CreateTeacherDto,
-  updateAdministratorSchema,
-  updateSecretarySchema,
-  updateStudentSchema,
-  updateTeacherSchema,
+  UpdateUserDto,
+  UPDATABLE_FIELDS_BY_ROLE,
 } from "../dtos/userDto";
 import { AppError } from "../utils/AppError";
 import { TokenPayload } from "../utils/jwt";
-import { assertCanAccessStudentData } from "../utils/accessControl";
-import { User, UserRole } from "../models/userModel";
+import {
+  assertCanAccessStudentData,
+  assertCanDeleteUser,
+  assertCanReachUser,
+  filterVisibleUsers,
+} from "../utils/accessControl";
+import { User } from "../models/userModel";
 
 const PASSWORD_SALT_ROUNDS = 10;
 
-const UPDATE_SCHEMA_BY_ROLE: Record<UserRole, ZodObject> = {
-  ADMIN: updateAdministratorSchema,
-  STUDENT: updateStudentSchema,
-  SECRETARY: updateSecretarySchema,
-  TEACHER: updateTeacherSchema,
-};
+const hashPassword = (plainPassword: string): Promise<string> =>
+  bcrypt.hash(plainPassword, PASSWORD_SALT_ROUNDS);
 
-/**
- * The matricule is the login credential of every account: it is hashed as
- * the initial password, so it must be unique like the email.
- */
+const trimText = <TDto extends { firstName?: string; lastName?: string }>(
+  dto: TDto,
+): TDto => ({
+  ...dto,
+  ...(dto.firstName !== undefined ? { firstName: dto.firstName.trim() } : {}),
+  ...(dto.lastName !== undefined ? { lastName: dto.lastName.trim() } : {}),
+});
+
 const assertEmailAndMatriculeAreFree = async (
   email: string | undefined,
   matricule: string,
@@ -50,52 +52,83 @@ const assertEmailAndMatriculeAreFree = async (
   }
 };
 
-const hashPassword = (plainPassword: string): Promise<string> =>
-  bcrypt.hash(plainPassword, PASSWORD_SALT_ROUNDS);
+const pickFieldsOfRole = (
+  role: User["role"],
+  updateData: UpdateUserDto,
+): Record<string, unknown> =>
+  Object.fromEntries(
+    UPDATABLE_FIELDS_BY_ROLE[role]
+      .filter((field) => updateData[field] !== undefined)
+      .map((field) => [field, updateData[field]]),
+  );
+
+const findUserOrThrow = async (id: string): Promise<User> => {
+  const user = await userRepository.findById(id);
+  if (!user) {
+    throw new AppError("User not found", 404);
+  }
+  return user;
+};
 
 export const userService = {
-  getAllUsers: async (filters: UserFilters): Promise<User[]> => {
-    return userRepository.getAllUsers(filters);
+  getAllUsers: async (
+    filters: UserFilters,
+    requester: TokenPayload,
+  ): Promise<User[]> => {
+    const users = await userRepository.getAllUsers(filters);
+    return filterVisibleUsers(requester, users);
   },
 
-  getStaff: async (): Promise<User[]> => {
+  getStaff: async (requester: TokenPayload): Promise<User[]> => {
     const everyone = await userRepository.getAllUsers();
-    return everyone.filter((user) => user.role !== "STUDENT");
+    return filterVisibleUsers(requester, everyone).filter(
+      (user) => user.role !== "STUDENT",
+    );
   },
 
   createAdministrator: async (dto: CreateAdministratorDto): Promise<User> => {
-    await assertEmailAndMatriculeAreFree(dto.email, dto.matricule);
+    await assertEmailAndMatriculeAreFree(undefined, dto.matricule);
     const hashedPassword = await hashPassword(dto.matricule);
     return userRepository.createAdministrator(
-      dto,
+      trimText(dto),
       dto.matricule,
       hashedPassword,
     );
   },
 
   createStudent: async (dto: CreateStudentDto): Promise<User> => {
-    await assertEmailAndMatriculeAreFree(dto.email, dto.matricule);
+    await assertEmailAndMatriculeAreFree(undefined, dto.matricule);
     const hashedPassword = await hashPassword(dto.matricule);
-    return userRepository.createStudent(dto, dto.matricule, hashedPassword);
+    return userRepository.createStudent(
+      trimText(dto),
+      dto.matricule,
+      hashedPassword,
+    );
   },
 
   createSecretary: async (dto: CreateSecretaryDto): Promise<User> => {
-    await assertEmailAndMatriculeAreFree(dto.email, dto.matricule);
+    await assertEmailAndMatriculeAreFree(undefined, dto.matricule);
     const hashedPassword = await hashPassword(dto.matricule);
-    return userRepository.createSecretary(dto, dto.matricule, hashedPassword);
+    return userRepository.createSecretary(
+      trimText(dto),
+      dto.matricule,
+      hashedPassword,
+    );
   },
 
   createTeacher: async (dto: CreateTeacherDto): Promise<User> => {
-    await assertEmailAndMatriculeAreFree(dto.email, dto.matricule);
+    await assertEmailAndMatriculeAreFree(undefined, dto.matricule);
     const hashedPassword = await hashPassword(dto.matricule);
-    return userRepository.createTeacher(dto, dto.matricule, hashedPassword);
+    return userRepository.createTeacher(
+      trimText(dto),
+      dto.matricule,
+      hashedPassword,
+    );
   },
 
-  getUserById: async (id: string): Promise<User> => {
-    const user = await userRepository.findById(id);
-    if (!user) {
-      throw new AppError("User not found", 404);
-    }
+  getUserById: async (id: string, requester: TokenPayload): Promise<User> => {
+    const user = await findUserOrThrow(id);
+    assertCanReachUser(requester, user);
     return user;
   },
 
@@ -103,10 +136,8 @@ export const userService = {
     targetUserId: string,
     requester: TokenPayload,
   ): Promise<User> => {
-    const targetUser = await userRepository.findById(targetUserId);
-    if (!targetUser) {
-      throw new AppError("User not found", 404);
-    }
+    const targetUser = await findUserOrThrow(targetUserId);
+    assertCanReachUser(requester, targetUser);
 
     if (targetUser.role === "STUDENT") {
       assertCanAccessStudentData(requester, targetUserId);
@@ -116,49 +147,47 @@ export const userService = {
 
   updateUser: async (
     targetUserId: string,
-    rawUpdateData: unknown,
+    rawUpdateData: UpdateUserDto,
+    requester: TokenPayload,
   ): Promise<User> => {
-    const targetUser = await userRepository.findById(targetUserId);
-    if (!targetUser) {
-      throw new AppError("User not found", 404);
-    }
+    const targetUser = await findUserOrThrow(targetUserId);
+    assertCanReachUser(requester, targetUser);
 
-    const updateSchema = UPDATE_SCHEMA_BY_ROLE[targetUser.role];
-    const updateData = updateSchema.shape.body.parse(rawUpdateData) as Record<
-      string,
-      unknown
-    >;
+    const updateData = pickFieldsOfRole(
+      targetUser.role,
+      trimText(rawUpdateData),
+    ) as UpdateUserDto;
+    const newEmail = updateData.email?.toLowerCase();
+    const normalizedData = {
+      ...updateData,
+      ...(newEmail ? { email: newEmail } : {}),
+    };
 
-    const newMatricule = updateData.matricule as string | undefined;
-    const newEmail = updateData.email as string | undefined;
     await assertEmailAndMatriculeAreFree(
       newEmail,
-      newMatricule ?? targetUser.matricule,
+      updateData.matricule ?? targetUser.matricule,
       targetUserId,
     );
 
-    // The matricule is the credential: changing it renews the password unless
-    // an explicit password is given.
-    const passwordSource =
-      (updateData.password as string | undefined) ?? newMatricule;
+    const passwordSource = updateData.password ?? updateData.matricule;
     const hashedPassword = passwordSource
       ? await hashPassword(passwordSource)
       : undefined;
 
     await userRepository.updateUserBase(targetUserId, {
-      ...updateData,
+      ...normalizedData,
       password: hashedPassword,
     });
 
     if (targetUser.role === "STUDENT") {
-      await userRepository.updateStudentDetails(targetUserId, updateData);
+      await userRepository.updateStudentDetails(targetUserId, normalizedData);
     } else if (targetUser.role === "SECRETARY") {
-      await userRepository.updateSecretaryDetails(targetUserId, updateData);
+      await userRepository.updateSecretaryDetails(targetUserId, normalizedData);
     } else if (targetUser.role === "TEACHER") {
-      await userRepository.updateTeacherDetails(targetUserId, updateData);
+      await userRepository.updateTeacherDetails(targetUserId, normalizedData);
     }
 
-    return userService.getUserById(targetUserId);
+    return findUserOrThrow(targetUserId);
   },
 
   deactivateStudent: async (targetUserId: string): Promise<void> => {
@@ -173,12 +202,12 @@ export const userService = {
     targetUserId: string,
     requesterId: string,
   ): Promise<void> => {
+    const targetUser = await findUserOrThrow(targetUserId);
+    assertCanDeleteUser(targetUser);
+
     if (targetUserId === requesterId) {
       throw new AppError("You cannot delete your own account", 400);
     }
-    const deleted = await userRepository.deleteUser(targetUserId);
-    if (!deleted) {
-      throw new AppError("User not found", 404);
-    }
+    await userRepository.deleteUser(targetUserId);
   },
 };

@@ -11,6 +11,8 @@ const SUBJECT_COLUMN_WIDTH = 130;
 const COEFFICIENT_COLUMN_X = 135;
 const COEFFICIENT_COLUMN_WIDTH = 35;
 const GRADE_COLUMN_WIDTH = 40;
+const AVERAGE_COLUMN_X = 445;
+const AVERAGE_COLUMN_WIDTH = 65;
 
 const GRADE_COLUMNS: {
   label: string;
@@ -43,8 +45,6 @@ export const pdfService = {
         const doc = new PDFDocument({ margin: PAGE_MARGIN, size: "A4" });
         const stream = fs.createWriteStream(filePath);
         doc.pipe(stream);
-
-        // Header
         doc
           .fontSize(18)
           .font("Helvetica-Bold")
@@ -55,12 +55,14 @@ export const pdfService = {
           .font("Helvetica")
           .text(`Année scolaire : ${result.academicYear}`, { align: "center" });
         doc.moveDown(1);
-
-        // Student information
         const studentInformation = [
           { label: "Élève : ", value: studentName },
           { label: "Classe : ", value: result.classGroup },
           { label: "Statut du bulletin : ", value: result.status },
+          {
+            label: "Notes : ",
+            value: "note sur 20 multipliée par le coefficient de la matière",
+          },
         ];
         doc.fontSize(11);
         studentInformation.forEach(({ label, value }) => {
@@ -71,8 +73,6 @@ export const pdfService = {
             .text(value);
         });
         doc.moveDown(1.5);
-
-        // Grades table
         const tableTop = doc.y;
         const separatorY = tableTop + 15;
 
@@ -89,6 +89,10 @@ export const pdfService = {
             width: GRADE_COLUMN_WIDTH,
             align: "center",
           });
+        });
+        doc.text("Moyenne", PAGE_MARGIN + AVERAGE_COLUMN_X, tableTop, {
+          width: AVERAGE_COLUMN_WIDTH,
+          align: "center",
         });
         doc
           .moveTo(PAGE_MARGIN, separatorY)
@@ -108,9 +112,15 @@ export const pdfService = {
             rowY,
             { width: COEFFICIENT_COLUMN_WIDTH, align: "center" },
           );
+          doc.text(
+            subject.subjectOverallAverage?.toString() ?? "",
+            PAGE_MARGIN + AVERAGE_COLUMN_X,
+            rowY,
+            { width: AVERAGE_COLUMN_WIDTH, align: "center" },
+          );
           GRADE_COLUMNS.forEach(({ field, offsetX }) => {
             doc.text(
-              subject[field]?.toString() ?? "-",
+              subject[field]?.toString() ?? "",
               PAGE_MARGIN + offsetX,
               rowY,
               {
@@ -120,8 +130,6 @@ export const pdfService = {
             );
           });
         });
-
-        // Annual summary
         const tableBottom =
           tableTop +
           HEADER_ROW_HEIGHT +
@@ -160,8 +168,6 @@ export const pdfService = {
             .fontSize(line.size)
             .text(line.text, PAGE_MARGIN, tableBottom + 15 + lineIndex * 18);
         });
-
-        // Signature
         doc
           .fontSize(10)
           .font("Helvetica-Bold")

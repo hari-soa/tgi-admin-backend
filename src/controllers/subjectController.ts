@@ -6,7 +6,7 @@ import { CreateSubjectDto, UpdateSubjectDto } from "../dtos/subjectDto";
 type IdParams = { id: string };
 
 export const subjectController = {
-  create: catchAsync(
+  createSubject: catchAsync(
     async (
       req: Request<unknown, unknown, CreateSubjectDto>,
       res: Response,
@@ -20,7 +20,7 @@ export const subjectController = {
     },
   ),
 
-  update: catchAsync(
+  updateSubject: catchAsync(
     async (
       req: Request<IdParams, unknown, UpdateSubjectDto>,
       res: Response,
@@ -37,7 +37,7 @@ export const subjectController = {
     },
   ),
 
-  getAll: catchAsync(async (_req: Request, res: Response): Promise<void> => {
+  listSubjects: catchAsync(async (_req: Request, res: Response): Promise<void> => {
     const subjects = await subjectService.getAllSubjects();
     res.status(200).json({
       status: "success",
@@ -46,14 +46,14 @@ export const subjectController = {
     });
   }),
 
-  getById: catchAsync(
+  getSubjectById: catchAsync(
     async (req: Request<IdParams>, res: Response): Promise<void> => {
       const subject = await subjectService.getSubjectById(req.params.id);
       res.status(200).json({ status: "success", data: { subject } });
     },
   ),
 
-  delete: catchAsync(
+  deleteSubject: catchAsync(
     async (req: Request<IdParams>, res: Response): Promise<void> => {
       await subjectService.deleteSubject(req.params.id);
       res.status(204).send();

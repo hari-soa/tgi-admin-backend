@@ -51,11 +51,11 @@ CREATE TABLE students (
     user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     class_roll_number INT NOT NULL,
     class_group class_group_enum NOT NULL,
-    date_of_birth DATE NOT NULL,
+    date_of_birth DATE,
     gender gender_enum NOT NULL,
-    address TEXT NOT NULL,
-    parents_email VARCHAR(255) NOT NULL,
-    parents_contact_number VARCHAR(30) NOT NULL,
+    address TEXT,
+    parents_email VARCHAR(255),
+    parents_contact_number VARCHAR(30),
     entry_year INT NOT NULL,
     graduation_year INT,
     comments TEXT,
@@ -113,10 +113,10 @@ CREATE TABLE teacher_attendance_slots (
     teacher_id UUID NOT NULL REFERENCES teachers(user_id) ON DELETE CASCADE,
     subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
     target_class class_group_enum NOT NULL,
-    day_of_week VARCHAR(15) NOT NULL, -- 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'
+    day_of_week VARCHAR(15) NOT NULL,
     start_time TIME NOT NULL,
     end_time TIME NOT NULL,
-    classroom VARCHAR(50) NOT NULL,
+    classroom VARCHAR(50),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -128,8 +128,8 @@ CREATE TABLE teacher_attendances (
     status attendance_status_enum NOT NULL DEFAULT 'PRESENT',
     actual_check_in_time TIMESTAMP WITH TIME ZONE,
     late_duration_minutes INT DEFAULT 0,
-    motif TEXT, -- Saisissable et modifiable UNIQUEMENT par un ADMIN
-    recorded_by UUID NOT NULL REFERENCES users(id), -- Admin ou Secrétaire
+    motif TEXT,
+    recorded_by UUID NOT NULL REFERENCES users(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT unique_slot_per_day UNIQUE (slot_id, attendance_date)
@@ -158,6 +158,15 @@ CREATE TABLE grade_sessions (
 
 CREATE UNIQUE INDEX unique_grade_session
 ON grade_sessions (class_group, subject_id, exam_type, term, academic_year);
+
+CREATE TABLE grade_session_absences (
+    session_id UUID NOT NULL REFERENCES grade_sessions(id) ON DELETE CASCADE,
+    student_id UUID NOT NULL REFERENCES students(user_id) ON DELETE CASCADE,
+    motif TEXT,
+    history_record_id UUID REFERENCES student_history_records(id) ON DELETE SET NULL,
+    recorded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (session_id, student_id)
+);
 
 CREATE TABLE grades (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -203,13 +212,13 @@ CREATE TABLE annual_result_subject_breakdowns (
     subject_id UUID REFERENCES subjects(id) ON DELETE SET NULL, 
     subject_name VARCHAR(100) NOT NULL, 
     coefficient NUMERIC(3, 1) NOT NULL,
-    term1_semi_trimester_grade NUMERIC(4, 2),
-    term1_trimester_grade NUMERIC(4, 2),
-    term2_semi_trimester_grade NUMERIC(4, 2),
-    term2_trimester_grade NUMERIC(4, 2),
-    term3_semi_trimester_grade NUMERIC(4, 2),
-    term3_trimester_grade NUMERIC(4, 2),
-    subject_overall_average NUMERIC(4, 2) NOT NULL
+    term1_semi_trimester_grade NUMERIC(6, 2),
+    term1_trimester_grade NUMERIC(6, 2),
+    term2_semi_trimester_grade NUMERIC(6, 2),
+    term2_trimester_grade NUMERIC(6, 2),
+    term3_semi_trimester_grade NUMERIC(6, 2),
+    term3_trimester_grade NUMERIC(6, 2),
+    subject_overall_average NUMERIC(6, 2)
 );
 
 CREATE TABLE announcements (
@@ -218,7 +227,7 @@ CREATE TABLE announcements (
     content TEXT NOT NULL,
     author_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     target_scope target_scope_enum NOT NULL,
-    target_value VARCHAR(100), -- Utilisé si besoin de spécifier plus précisément
+    target_value VARCHAR(100),
     priority announcement_priority_enum NOT NULL DEFAULT 'NORMAL',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP

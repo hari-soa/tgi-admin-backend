@@ -20,9 +20,12 @@ export const authController = {
     },
   ),
 
-  getMe: catchAsync(
+  getAuthenticatedUser: catchAsync(
     async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-      const user = await userService.getUserById(req.user!.userId);
+      const user = await userService.getUserProfile(
+        req.user!.userId,
+        req.user!,
+      );
       res.status(200).json({ status: "success", data: { user } });
     },
   ),

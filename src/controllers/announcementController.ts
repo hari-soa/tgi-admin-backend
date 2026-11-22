@@ -10,7 +10,7 @@ import {
 type IdParams = { id: string };
 
 export const announcementController = {
-  create: catchAsync(
+  createAnnouncement: catchAsync(
     async (
       req: AuthenticatedRequest<unknown, CreateAnnouncementDto>,
       res: Response,
@@ -27,7 +27,7 @@ export const announcementController = {
     },
   ),
 
-  getAll: catchAsync(
+  listAnnouncements: catchAsync(
     async (req: AuthenticatedRequest, res: Response): Promise<void> => {
       const announcements = await announcementService.getAllAnnouncements(
         req.user!,
@@ -40,7 +40,7 @@ export const announcementController = {
     },
   ),
 
-  getById: catchAsync(
+  getAnnouncementById: catchAsync(
     async (
       req: AuthenticatedRequest<IdParams>,
       res: Response,
@@ -53,7 +53,7 @@ export const announcementController = {
     },
   ),
 
-  update: catchAsync(
+  updateAnnouncement: catchAsync(
     async (
       req: Request<IdParams, unknown, UpdateAnnouncementDto>,
       res: Response,
@@ -70,7 +70,7 @@ export const announcementController = {
     },
   ),
 
-  delete: catchAsync(
+  deleteAnnouncement: catchAsync(
     async (req: Request<IdParams>, res: Response): Promise<void> => {
       await announcementService.deleteAnnouncement(req.params.id);
       res.status(204).send();

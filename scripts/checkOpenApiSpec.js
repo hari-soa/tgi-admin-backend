@@ -1,62 +1,66 @@
-/**
- * Fails when the routes declared in src/routes and the operations described in
- * docs/openAPI.yml are not exactly the same. Run with: npm run check:spec
- */
 const fs = require("fs");
 const path = require("path");
 const yaml = require("js-yaml");
 
+const SPEC_FILE = path.join(__dirname, "../docs/openAPI.yml");
+const CONTROLLERS_DIRECTORY = path.join(__dirname, "../src/controllers");
 const HTTP_METHODS = ["get", "post", "put", "patch", "delete"];
-const ROUTE_FILE_BY_PREFIX = {
-  auth: "authRoutes",
-  users: "userRoutes",
-  subjects: "subjectRoutes",
-  announcements: "announcementRoutes",
-  disciplinary: "disciplinaryRoutes",
-  attendance: "teacherAttendanceRoutes",
-  grades: "gradeRoutes",
-  results: "resultRoutes",
-};
+const HANDLER_PATTERN = /^ {2}(\w+): catchAsync/gm;
 
-const normalizePath = (routePath) =>
-  routePath.replace(/\{\w+\}/g, ":param").replace(/:\w+/g, ":param");
+const specification = yaml.load(fs.readFileSync(SPEC_FILE, "utf8"));
 
-const readSpecOperations = () => {
-  const specification = yaml.load(
-    fs.readFileSync(path.join(__dirname, "../docs/openAPI.yml"), "utf8"),
-  );
-  return Object.entries(specification.paths).flatMap(([routePath, item]) =>
-    HTTP_METHODS.filter((method) => item[method]).map(
-      (method) => `${method.toUpperCase()} ${normalizePath(routePath)}`,
-    ),
-  );
-};
+const specOperations = Object.entries(specification.paths).flatMap(
+  ([route, pathItem]) =>
+    HTTP_METHODS.filter((method) => pathItem[method]).map((method) => ({
+      label: `${method.toUpperCase()} ${route}`,
+      operationId: pathItem[method].operationId,
+      secured: pathItem[method].security?.length !== 0,
+      roles: pathItem[method]["x-roles"],
+    })),
+);
 
-const readCodeOperations = () =>
-  Object.entries(ROUTE_FILE_BY_PREFIX).flatMap(([prefix, fileName]) => {
+const controllerHandlers = fs
+  .readdirSync(CONTROLLERS_DIRECTORY)
+  .filter((fileName) => fileName.endsWith("Controller.ts"))
+  .flatMap((fileName) => {
     const source = fs.readFileSync(
-      path.join(__dirname, `../src/routes/${fileName}.ts`),
+      path.join(CONTROLLERS_DIRECTORY, fileName),
       "utf8",
     );
-    const routeMatches = [
-      ...source.matchAll(/router\s*\.(get|post|put|patch|delete)\(\s*"([^"]*)"/g),
-    ];
-    return routeMatches.map(([, method, routePath]) => {
-      const suffix = routePath === "/" ? "" : routePath;
-      return `${method.toUpperCase()} ${normalizePath(`/${prefix}${suffix}`)}`;
-    });
+    return [...source.matchAll(HANDLER_PATTERN)].map((match) => match[1]);
   });
 
-const specOperations = new Set(readSpecOperations());
-const codeOperations = new Set(readCodeOperations());
+const missingOperationId = specOperations.filter(
+  (operation) => !operation.operationId,
+);
+const securedWithoutRoles = specOperations.filter(
+  (operation) => operation.secured && !operation.roles?.length,
+);
+const operationIds = specOperations.map((operation) => operation.operationId);
+const duplicatedIds = operationIds.filter(
+  (id, index) => operationIds.indexOf(id) !== index,
+);
+const withoutHandler = specOperations.filter(
+  (operation) => !controllerHandlers.includes(operation.operationId),
+);
+const withoutOperation = controllerHandlers.filter(
+  (handler) => !operationIds.includes(handler),
+);
 
-const missingInSpec = [...codeOperations].filter((op) => !specOperations.has(op));
-const missingInCode = [...specOperations].filter((op) => !codeOperations.has(op));
+const problems = [
+  ...missingOperationId.map((operation) => `${operation.label}: missing operationId`),
+  ...securedWithoutRoles.map((operation) => `${operation.label}: missing x-roles`),
+  ...duplicatedIds.map((id) => `${id}: duplicated operationId`),
+  ...withoutHandler.map(
+    (operation) => `${operation.label}: no controller handler named ${operation.operationId}`,
+  ),
+  ...withoutOperation.map((handler) => `${handler}: controller handler without operation in the spec`),
+];
 
-if (missingInSpec.length > 0 || missingInCode.length > 0) {
-  console.error("Routes missing in docs/openAPI.yml:", missingInSpec);
-  console.error("Operations in the spec without a route:", missingInCode);
+if (problems.length > 0) {
+  console.error("OpenAPI specification and controllers are out of sync:");
+  problems.forEach((problem) => console.error(` - ${problem}`));
   process.exit(1);
 }
 
-console.log(`OpenAPI spec and routes are aligned (${codeOperations.size} operations).`);
+console.log(`OK: ${specOperations.length} operations are routed from the specification.`);

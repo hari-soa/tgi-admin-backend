@@ -1,15 +1,11 @@
 const SCHOOL_TIME_ZONE = process.env.SCHOOL_TIME_ZONE || "Indian/Antananarivo";
 
 export interface SchoolClock {
-  date: string; // YYYY-MM-DD
+  date: string;
   hours: number;
   minutes: number;
 }
 
-/**
- * Current date and time expressed in the school time zone, so that lateness
- * does not depend on the time zone of the server (Render runs in UTC).
- */
 export const getSchoolClock = (now: Date = new Date()): SchoolClock => {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: SCHOOL_TIME_ZONE,

@@ -3,6 +3,7 @@ import {
   AnnualResultInput,
 } from "../repositories/resultRepository";
 import {
+  AbsentSubjectRow,
   gradeRepository,
   PublishedGradeRow,
 } from "../repositories/gradeRepository";
@@ -18,7 +19,6 @@ import { AppError } from "../utils/AppError";
 import { assertCanAccessStudentData } from "../utils/accessControl";
 import { pdfService } from "./pdfService";
 
-const MAX_GRADE_SCALE = 20;
 const TERM_NUMBER: Record<string, number> = {
   FIRST_TRIMESTER: 1,
   SECOND_TRIMESTER: 2,
@@ -43,42 +43,51 @@ const GRADE_FIELDS: SubjectGradeField[] = [
   "term3TrimesterGrade",
 ];
 
-/**
- * Builds one breakdown per subject. Every grade is brought back to a /20
- * scale; when a student has several grades for the same slot, the most
- * recent one wins (rows arrive ordered by evaluation date).
- */
+const createEmptyBreakdown = (
+  subject: AbsentSubjectRow | PublishedGradeRow,
+): SubjectGradeBreakdown => ({
+  subjectId: subject.subjectId,
+  subjectName: subject.subjectName,
+  coefficient: subject.coefficient,
+  subjectOverallAverage: null,
+});
+
+const computeSubjectAverage = (
+  breakdown: SubjectGradeBreakdown,
+): number | null => {
+  const availableGrades = GRADE_FIELDS.map((field) => breakdown[field]).filter(
+    (value): value is number => value !== undefined && value !== null,
+  );
+  if (availableGrades.length === 0) {
+    return null;
+  }
+  const gradeSum = availableGrades.reduce((sum, value) => sum + value, 0);
+  return roundToTwoDecimals(gradeSum / availableGrades.length);
+};
+
 const buildSubjectBreakdowns = (
   publishedGrades: PublishedGradeRow[],
+  absentSubjects: AbsentSubjectRow[],
 ): SubjectGradeBreakdown[] => {
   const breakdownBySubject = new Map<string, SubjectGradeBreakdown>();
 
+  absentSubjects.forEach((subject) => {
+    breakdownBySubject.set(subject.subjectId, createEmptyBreakdown(subject));
+  });
+
   publishedGrades.forEach((grade) => {
-    const breakdown = breakdownBySubject.get(grade.subjectId) ?? {
-      subjectId: grade.subjectId,
-      subjectName: grade.subjectName,
-      coefficient: grade.coefficient,
-      subjectOverallAverage: 0,
-    };
-    const normalizedValue = roundToTwoDecimals(
-      (grade.value / grade.maxScore) * MAX_GRADE_SCALE,
+    const breakdown =
+      breakdownBySubject.get(grade.subjectId) ?? createEmptyBreakdown(grade);
+    breakdown[getGradeField(grade.term, grade.examType)] = roundToTwoDecimals(
+      grade.value * grade.coefficient,
     );
-    breakdown[getGradeField(grade.term, grade.examType)] = normalizedValue;
     breakdownBySubject.set(grade.subjectId, breakdown);
   });
 
-  return [...breakdownBySubject.values()].map((breakdown) => {
-    const availableGrades = GRADE_FIELDS.map(
-      (field) => breakdown[field],
-    ).filter((value): value is number => value !== undefined);
-    const gradeSum = availableGrades.reduce((sum, value) => sum + value, 0);
-    return {
-      ...breakdown,
-      subjectOverallAverage: roundToTwoDecimals(
-        gradeSum / availableGrades.length,
-      ),
-    };
-  });
+  return [...breakdownBySubject.values()].map((breakdown) => ({
+    ...breakdown,
+    subjectOverallAverage: computeSubjectAverage(breakdown),
+  }));
 };
 
 const getAcademicYearBounds = (academicYear: string) => {
@@ -94,7 +103,6 @@ const getResultOrThrow = async (id: string): Promise<AnnualResult> => {
   return result;
 };
 
-/** A student can only see their own report card, once it has been published. */
 const assertCanReadResult = (
   requester: TokenPayload,
   result: AnnualResult,
@@ -116,11 +124,7 @@ export const resultService = {
     return resultRepository.findById(result.id);
   },
 
-  /**
-   * Recomputes the annual result of each student from the grades that have
-   * been published so far, publishes it and refreshes the class ranking.
-   */
-  refreshResultsFromPublishedGrades: async (
+    refreshResultsFromPublishedGrades: async (
     studentIds: string[],
     classGroup: string,
     academicYear: string,
@@ -132,20 +136,33 @@ export const resultService = {
 
     await Promise.all(
       uniqueStudentIds.map(async (studentId) => {
-        const publishedGrades = await gradeRepository.findPublishedForStudent(
-          studentId,
-          classGroup,
-          startDate,
-          endDate,
+        const [publishedGrades, absentSubjects] = await Promise.all([
+          gradeRepository.findPublishedForStudent(
+            studentId,
+            classGroup,
+            startDate,
+            endDate,
+          ),
+          gradeRepository.findAbsentSubjectsForStudent(
+            studentId,
+            classGroup,
+            academicYear,
+          ),
+        ]);
+        const subjects = buildSubjectBreakdowns(publishedGrades, absentSubjects);
+        const countedSubjects = subjects.filter(
+          (subject) => subject.subjectOverallAverage !== null,
         );
-        const subjects = buildSubjectBreakdowns(publishedGrades);
-        const totalCoefficients = subjects.reduce(
+        if (countedSubjects.length === 0) {
+          return;
+        }
+
+        const totalCoefficients = countedSubjects.reduce(
           (sum, subject) => sum + subject.coefficient,
           0,
         );
-        const weightedSum = subjects.reduce(
-          (sum, subject) =>
-            sum + subject.subjectOverallAverage * subject.coefficient,
+        const weightedSum = countedSubjects.reduce(
+          (sum, subject) => sum + (subject.subjectOverallAverage as number),
           0,
         );
 

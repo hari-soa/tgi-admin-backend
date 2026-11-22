@@ -9,9 +9,7 @@ import {
 } from "../dtos/userDto";
 import { buildUpdateStatement } from "../utils/sqlUpdate";
 
-const DEFAULT_CONTACT_NUMBER = "Non spécifié";
-const DEFAULT_ADDRESS = "Non spécifiée";
-const DEFAULT_PARENTS_EMAIL = "non.specifie@gmail.com";
+const EMPTY_CONTACT_NUMBER = "";
 
 export interface UserFilters {
   role?: UserRole;
@@ -34,11 +32,13 @@ const USER_WITH_DETAILS_SELECT = `
          s.parents_email AS "parentsEmail", s.parents_contact_number AS "parentsContactNumber",
          s.entry_year AS "entryYear", s.graduation_year AS "graduationYear",
          s.comments, s.is_active AS "isActive",
-         t.homeroom_class AS "homeroomClass", sec.department
+         t.homeroom_class AS "homeroomClass", sec.department,
+         COALESCE(adm.role = 'SUPER_ADMIN', FALSE) AS "isSuperAdmin"
   FROM users u
   LEFT JOIN students s ON u.id = s.user_id
   LEFT JOIN teachers t ON u.id = t.user_id
   LEFT JOIN secretaries sec ON u.id = sec.user_id
+  LEFT JOIN administrators adm ON u.id = adm.user_id
 `;
 
 const USER_COLUMN_MAPPING: Record<string, string> = {
@@ -70,8 +70,6 @@ interface BaseUserData {
   firstName: string;
   lastName: string;
   gender: string;
-  contactNumber?: string;
-  email?: string;
   profilePictureUrl?: string;
 }
 
@@ -91,8 +89,8 @@ const insertBaseUser = async (
       data.lastName,
       hashedPassword,
       matricule,
-      data.contactNumber || DEFAULT_CONTACT_NUMBER,
-      data.email || null,
+      EMPTY_CONTACT_NUMBER,
+      null,
       data.profilePictureUrl || null,
       userType,
       data.gender,
@@ -101,9 +99,6 @@ const insertBaseUser = async (
   return rows[0];
 };
 
-/**
- * Runs the base user insert and the role specific insert in one transaction.
- */
 const createUserWithRoleDetails = async (
   data: BaseUserData,
   userType: UserRole,
@@ -165,7 +160,6 @@ export const userRepository = {
     return rows;
   },
 
-  /** Used by the login: returns the password hash and the student status. */
   findByEmail: async (email: string): Promise<User | null> => {
     const query = `
       SELECT u.id, u.first_name AS "firstName", u.last_name AS "lastName", u.email, u.password,
@@ -241,11 +235,11 @@ export const userRepository = {
             userId,
             data.classRollNumber,
             data.classGroup,
-            data.dateOfBirth || new Date().toISOString().split("T")[0],
+            data.dateOfBirth || null,
             data.gender,
-            data.address || DEFAULT_ADDRESS,
-            data.parentsEmail || DEFAULT_PARENTS_EMAIL,
-            data.parentsContactNumber || DEFAULT_CONTACT_NUMBER,
+            data.address || null,
+            data.parentsEmail || null,
+            data.parentsContactNumber || null,
             data.entryYear || new Date().getFullYear(),
             data.graduationYear || null,
             data.comments || null,

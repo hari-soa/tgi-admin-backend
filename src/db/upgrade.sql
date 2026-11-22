@@ -1,6 +1,3 @@
--- Run once on a database created with the previous version of schema.sql.
--- Every statement is idempotent.
-
 ALTER TABLE students ADD COLUMN IF NOT EXISTS comments TEXT;
 
 CREATE TABLE IF NOT EXISTS grade_sessions (
@@ -30,3 +27,30 @@ ADD COLUMN IF NOT EXISTS session_id UUID REFERENCES grade_sessions(id) ON DELETE
 
 CREATE UNIQUE INDEX IF NOT EXISTS unique_annual_result_per_student_year
 ON annual_results (student_id, academic_year);
+
+CREATE TABLE IF NOT EXISTS grade_session_absences (
+    session_id UUID NOT NULL REFERENCES grade_sessions(id) ON DELETE CASCADE,
+    student_id UUID NOT NULL REFERENCES students(user_id) ON DELETE CASCADE,
+    motif TEXT,
+    history_record_id UUID REFERENCES student_history_records(id) ON DELETE SET NULL,
+    recorded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (session_id, student_id)
+);
+
+ALTER TABLE annual_result_subject_breakdowns
+ALTER COLUMN term1_semi_trimester_grade TYPE NUMERIC(6, 2),
+ALTER COLUMN term1_trimester_grade TYPE NUMERIC(6, 2),
+ALTER COLUMN term2_semi_trimester_grade TYPE NUMERIC(6, 2),
+ALTER COLUMN term2_trimester_grade TYPE NUMERIC(6, 2),
+ALTER COLUMN term3_semi_trimester_grade TYPE NUMERIC(6, 2),
+ALTER COLUMN term3_trimester_grade TYPE NUMERIC(6, 2),
+ALTER COLUMN subject_overall_average TYPE NUMERIC(6, 2),
+ALTER COLUMN subject_overall_average DROP NOT NULL;
+
+ALTER TABLE teacher_attendance_slots ALTER COLUMN classroom DROP NOT NULL;
+
+ALTER TABLE students
+ALTER COLUMN date_of_birth DROP NOT NULL,
+ALTER COLUMN address DROP NOT NULL,
+ALTER COLUMN parents_email DROP NOT NULL,
+ALTER COLUMN parents_contact_number DROP NOT NULL;

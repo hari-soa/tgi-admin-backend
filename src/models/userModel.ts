@@ -14,6 +14,7 @@ export interface User {
   gender: Gender;
   profilePictureUrl?: string;
   isActive?: boolean;
+  isSuperAdmin?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
